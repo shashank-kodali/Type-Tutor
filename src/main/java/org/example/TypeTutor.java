@@ -24,7 +24,7 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
-public class TypingSpeedApp extends Application {
+public class TypeTutor extends Application {
 
     private static final String BG_COLOR = "#323437";
     private static final String SUB_ALT_COLOR = "#2c2e31";
@@ -89,7 +89,7 @@ public class TypingSpeedApp extends Application {
     private Button startButton;
     private ToggleGroup difficultyGroup;
     private ToggleGroup timerGroup;
-    private VBox textAreaSection;
+    private VBox mainTypingArea; // Renamed for clarity
     private VBox resultsPanel;
     private StackPane centerStackPane;
 
@@ -114,6 +114,11 @@ public class TypingSpeedApp extends Application {
     private int cumulativeMissedChars = 0;
     private int cumulativeExtraChars = 0;
 
+    private int currentChunkCorrect = 0;
+    private int currentChunkTotal = 0;
+    private int currentChunkMissed = 0;
+    private int currentChunkExtra = 0;
+
     private static class WPMSnapshot {
         int second;
         double wpm;
@@ -137,7 +142,7 @@ public class TypingSpeedApp extends Application {
     @Override
     public void start(Stage primaryStage) {
         BorderPane root = new BorderPane();
-        root.setPadding(new Insets(20, 30, 20, 30));
+        root.setPadding(new Insets(50, 30, 20, 30));
         root.setStyle("-fx-background-color: " + BG_COLOR + ";");
 
         VBox topSection = new VBox(15);
@@ -145,7 +150,7 @@ public class TypingSpeedApp extends Application {
         topSection.setPadding(new Insets(30, 0, 0, 0));
 
         Label titleLabel = new Label("Type Tutor");
-        titleLabel.setFont(new Font("Lexend Deca", 32));
+        titleLabel.setFont(new Font("Lexend Deca", 36)); // User's custom font size
         titleLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: " + CARET_COLOR + ";");
 
         HBox controlBar = new HBox(30);
@@ -194,9 +199,10 @@ public class TypingSpeedApp extends Application {
         ToggleButton time30Btn = createMonkeyToggleButton("30", timerGroup);
         ToggleButton time60Btn = createMonkeyToggleButton("60", timerGroup);
         ToggleButton time120Btn = createMonkeyToggleButton("120", timerGroup);
+        ToggleButton customBtn = createMonkeyToggleButton("custom", timerGroup);
 
         time30Btn.setSelected(true);
-        timerButtons.getChildren().addAll(time15Btn, time30Btn, time60Btn, time120Btn);
+        timerButtons.getChildren().addAll(time15Btn, time30Btn, time60Btn, time120Btn, customBtn);
         timerSection.getChildren().addAll(timerIcon, timerSectionLabel, timerButtons);
 
         controlBar.getChildren().addAll(difficultySection, createSeparator(), timerSection);
@@ -205,11 +211,9 @@ public class TypingSpeedApp extends Application {
         centerStackPane = new StackPane();
         centerStackPane.setAlignment(Pos.CENTER);
 
-        textAreaSection = new VBox(12);
-        textAreaSection.setAlignment(Pos.CENTER);
-        textAreaSection.setPrefWidth(750);
-        textAreaSection.setMaxWidth(750);
+        // --- START OF MODIFIED LAYOUT CODE ---
 
+        // Initialize components with your custom styles
         timerLabel = new Label("30");
         timerLabel.setFont(new Font("Lexend Deca", 28));
         timerLabel.setStyle("-fx-text-fill: " + CARET_COLOR + "; -fx-font-weight: 300;");
@@ -244,7 +248,7 @@ public class TypingSpeedApp extends Application {
         });
 
         startButton = new Button("start");
-        startButton.setFont(new Font("Lexend Deca", 14));
+        startButton.setFont(new Font("Lexend Deca", 18)); // User's custom font size
         startButton.setPrefWidth(120);
         startButton.setPrefHeight(40);
         startButton.setStyle("-fx-background-color: " + SUB_COLOR + "; -fx-text-fill: " + BG_COLOR + "; " +
@@ -271,12 +275,31 @@ public class TypingSpeedApp extends Application {
             }
         });
 
-        textAreaSection.getChildren().addAll(timerLabel, sentenceDisplay, inputField, startButton);
+        // 1. Create Individual Containers for each component
+        StackPane timerPane = new StackPane(timerLabel);
+        StackPane sentencePane = new StackPane(sentenceDisplay);
+        StackPane inputPane = new StackPane(inputField);
+        StackPane buttonPane = new StackPane(startButton);
 
+        // 2. Apply positioning with Padding
+        sentencePane.setPadding(new Insets(100, 0, 200, 0)); // 80px bottom padding to push top elements up
+        buttonPane.setPadding(new Insets(20, 0, 0, 0));   // 20px top padding for space above button
+
+        // 3. Create the new parent VBox that will hold the individual containers
+        mainTypingArea = new VBox(); // Spacing is now controlled by padding on the panes
+        mainTypingArea.setAlignment(Pos.CENTER);
+        mainTypingArea.setPrefWidth(750);
+        mainTypingArea.setMaxWidth(750);
+
+        // 4. Add the individual containers to the parent VBox
+        mainTypingArea.getChildren().addAll(timerPane, sentencePane, inputPane, buttonPane);
+
+        // 5. Add the new layout and results panel to the main screen
         resultsPanel = createResultsPanel();
         resultsPanel.setVisible(false);
+        centerStackPane.getChildren().addAll(mainTypingArea, resultsPanel);
 
-        centerStackPane.getChildren().addAll(textAreaSection, resultsPanel);
+        // --- END OF MODIFIED LAYOUT CODE ---
 
         difficultyGroup.selectedToggleProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal != null) {
@@ -447,6 +470,8 @@ public class TypingSpeedApp extends Application {
         XYChart.Series<Number, Number> errorSeries = new XYChart.Series<>();
         errorSeries.setName("errors");
 
+        System.out.println("Creating chart with " + wpmHistory.size() + " WPM points and " + errorHistory.size() + " error points");
+
         for (WPMSnapshot snapshot : wpmHistory) {
             XYChart.Data<Number, Number> data = new XYChart.Data<>(snapshot.second, snapshot.wpm);
             wpmSeries.getData().add(data);
@@ -509,7 +534,11 @@ public class TypingSpeedApp extends Application {
 
     private void styleChart(LineChart<Number, Number> chart) {
         chart.setStyle("-fx-background-color: transparent; -fx-font-size: 22px;");
-        chart.lookup(".chart-plot-background").setStyle("-fx-background-color: " + SUB_ALT_COLOR + ";");
+        Platform.runLater(() -> {
+            if (chart.lookup(".chart-plot-background") != null) {
+                chart.lookup(".chart-plot-background").setStyle("-fx-background-color: " + SUB_ALT_COLOR + ";");
+            }
+        });
         chart.setLegendVisible(true);
     }
 
@@ -525,10 +554,14 @@ public class TypingSpeedApp extends Application {
         cumulativeTotalChars = 0;
         cumulativeMissedChars = 0;
         cumulativeExtraChars = 0;
+        currentChunkCorrect = 0;
+        currentChunkTotal = 0;
+        currentChunkMissed = 0;
+        currentChunkExtra = 0;
         textPosition = 0;
 
         resultsPanel.setVisible(false);
-        textAreaSection.setVisible(true);
+        mainTypingArea.setVisible(true); // MODIFIED
 
         timerLabel.setText(String.valueOf(selectedTime));
         inputField.clear();
@@ -549,37 +582,32 @@ public class TypingSpeedApp extends Application {
     private ToggleButton createMonkeyToggleButton(String text, ToggleGroup group) {
         ToggleButton btn = new ToggleButton(text);
         btn.setToggleGroup(group);
-        btn.setFont(new Font("Lexend Deca", 12));
+        btn.setFont(new Font("Lexend Deca", 18)); // User's custom font size
         btn.setPrefHeight(28);
         btn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + SUB_COLOR + "; " +
                 "-fx-border-color: transparent; -fx-background-radius: 6; " +
                 "-fx-padding: 5 14; -fx-cursor: hand;");
 
         btn.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            String baseStyle = "-fx-border-color: transparent; -fx-background-radius: 6; -fx-padding: 5 14; -fx-cursor: hand; -fx-font-size: 18px;";
             if (newVal) {
-                btn.setStyle("-fx-background-color: " + CARET_COLOR + "; -fx-text-fill: " + BG_COLOR + "; " +
-                        "-fx-border-color: transparent; -fx-background-radius: 6; " +
-                        "-fx-padding: 5 14; -fx-font-weight: 600; -fx-cursor: hand;");
+                btn.setStyle("-fx-background-color: " + CARET_COLOR + "; -fx-text-fill: " + BG_COLOR + "; -fx-font-weight: 600; " + baseStyle);
             } else {
-                btn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + SUB_COLOR + "; " +
-                        "-fx-border-color: transparent; -fx-background-radius: 6; " +
-                        "-fx-padding: 5 14; -fx-cursor: hand;");
+                btn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + SUB_COLOR + "; " + baseStyle);
             }
         });
 
         btn.setOnMouseEntered(e -> {
             if (!btn.isSelected()) {
-                btn.setStyle("-fx-background-color: " + SUB_ALT_COLOR + "; -fx-text-fill: " + MAIN_COLOR + "; " +
-                        "-fx-border-color: transparent; -fx-background-radius: 6; " +
-                        "-fx-padding: 5 14; -fx-cursor: hand;");
+                String baseStyle = "-fx-border-color: transparent; -fx-background-radius: 6; -fx-padding: 5 14; -fx-cursor: hand; -fx-font-size: 18px;";
+                btn.setStyle("-fx-background-color: " + SUB_ALT_COLOR + "; -fx-text-fill: " + MAIN_COLOR + "; " + baseStyle);
             }
         });
 
         btn.setOnMouseExited(e -> {
             if (!btn.isSelected()) {
-                btn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + SUB_COLOR + "; " +
-                        "-fx-border-color: transparent; -fx-background-radius: 6; " +
-                        "-fx-padding: 5 14; -fx-cursor: hand;");
+                String baseStyle = "-fx-border-color: transparent; -fx-background-radius: 6; -fx-padding: 5 14; -fx-cursor: hand; -fx-font-size: 18px;";
+                btn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + SUB_COLOR + "; " + baseStyle);
             }
         });
 
@@ -702,7 +730,41 @@ public class TypingSpeedApp extends Application {
     }
 
     private void updateTimer(String time) {
-        selectedTime = Integer.parseInt(time);
+        if (time.equals("custom")) {
+            TextInputDialog dialog = new TextInputDialog("45");
+            dialog.setTitle("Custom Time");
+            dialog.setHeaderText("Enter time in seconds:");
+            dialog.setContentText("Seconds:");
+
+            DialogPane dialogPane = dialog.getDialogPane();
+            dialogPane.setStyle("-fx-background-color: " + BG_COLOR + ";");
+
+            Optional<String> result = dialog.showAndWait();
+            result.ifPresent(seconds -> {
+                try {
+                    selectedTime = Integer.parseInt(seconds);
+                    if (selectedTime < 10 || selectedTime > 300) {
+                        Alert alert = new Alert(Alert.AlertType.WARNING);
+                        alert.setTitle("Invalid Time");
+                        alert.setHeaderText(null);
+                        alert.setContentText("Please enter between 10 and 300 seconds.");
+                        alert.showAndWait();
+                        selectedTime = 30;
+                        timerGroup.selectToggle(timerGroup.getToggles().get(1));
+                    }
+                } catch (NumberFormatException e) {
+                    Alert alert = new Alert(Alert.AlertType.WARNING);
+                    alert.setTitle("Invalid Input");
+                    alert.setHeaderText(null);
+                    alert.setContentText("Invalid input. Using default 30 seconds.");
+                    alert.showAndWait();
+                    selectedTime = 30;
+                    timerGroup.selectToggle(timerGroup.getToggles().get(1));
+                }
+            });
+        } else {
+            selectedTime = Integer.parseInt(time);
+        }
         timerLabel.setText(String.valueOf(selectedTime));
     }
 
@@ -734,7 +796,7 @@ public class TypingSpeedApp extends Application {
 
         for (int i = 0; i < sentence.length(); i++) {
             Text charText = new Text(String.valueOf(sentence.charAt(i)));
-            charText.setFont(new Font("Roboto Mono", 20));
+            charText.setFont(new Font("Roboto Mono", 30)); // User's custom font size
 
             if (i < matchLength) {
                 if (sentence.charAt(i) == typedText.charAt(i)) {
@@ -756,7 +818,7 @@ public class TypingSpeedApp extends Application {
         if (typedText.length() > sentence.length()) {
             for (int i = sentence.length(); i < typedText.length(); i++) {
                 Text extraChar = new Text(String.valueOf(typedText.charAt(i)));
-                extraChar.setFont(new Font("Roboto Mono", 20));
+                extraChar.setFont(new Font("Roboto Mono", 30)); // User's custom font size
                 extraChar.setFill(Color.web(ERROR_EXTRA_COLOR));
                 extraChar.setStyle("-fx-font-weight: bold;");
                 sentenceDisplay.getChildren().add(extraChar);
@@ -767,28 +829,34 @@ public class TypingSpeedApp extends Application {
     private void updateDisplay(String typedText) {
         displaySentence(currentSentence, typedText);
 
-        int correctInChunk = 0;
-        int missedInChunk = 0;
-        int extraInChunk = 0;
+        currentChunkCorrect = 0;
+        currentChunkMissed = 0;
+        currentChunkExtra = 0;
+        currentChunkTotal = typedText.length();
 
         int matchLength = Math.min(currentSentence.length(), typedText.length());
         for (int i = 0; i < matchLength; i++) {
             if (currentSentence.charAt(i) == typedText.charAt(i)) {
-                correctInChunk++;
+                currentChunkCorrect++;
             } else {
-                missedInChunk++;
+                currentChunkMissed++;
             }
         }
 
         if (typedText.length() > currentSentence.length()) {
-            extraInChunk = typedText.length() - currentSentence.length();
+            currentChunkExtra = typedText.length() - currentSentence.length();
         }
 
         if (typedText.equals(currentSentence)) {
-            cumulativeCorrectChars += correctInChunk;
-            cumulativeTotalChars += typedText.length();
-            cumulativeMissedChars += missedInChunk;
-            cumulativeExtraChars += extraInChunk;
+            cumulativeCorrectChars += currentChunkCorrect;
+            cumulativeTotalChars += currentChunkTotal;
+            cumulativeMissedChars += currentChunkMissed;
+            cumulativeExtraChars += currentChunkExtra;
+
+            currentChunkCorrect = 0;
+            currentChunkTotal = 0;
+            currentChunkMissed = 0;
+            currentChunkExtra = 0;
 
             textPosition += currentSentence.length();
             loadNewSentence();
@@ -808,6 +876,10 @@ public class TypingSpeedApp extends Application {
         cumulativeTotalChars = 0;
         cumulativeMissedChars = 0;
         cumulativeExtraChars = 0;
+        currentChunkCorrect = 0;
+        currentChunkTotal = 0;
+        currentChunkMissed = 0;
+        currentChunkExtra = 0;
         wpmHistory.clear();
         errorHistory.clear();
         startTime = System.currentTimeMillis();
@@ -835,20 +907,24 @@ public class TypingSpeedApp extends Application {
             @Override
             public void run() {
                 Platform.runLater(() -> {
+                    int elapsedSeconds = selectedTime - remainingSeconds + 1;
+
+                    int totalCorrect = cumulativeCorrectChars + currentChunkCorrect;
+                    int totalTyped = cumulativeTotalChars + currentChunkTotal;
+                    int totalErrors = (cumulativeMissedChars + currentChunkMissed) + (cumulativeExtraChars + currentChunkExtra);
+
+                    double minutes = elapsedSeconds / 60.0;
+                    double wpm = totalCorrect > 0 ? (totalCorrect / 5.0) / minutes : 0;
+                    double rawWpm = totalTyped > 0 ? (totalTyped / 5.0) / minutes : 0;
+
+                    wpmHistory.add(new WPMSnapshot(elapsedSeconds, wpm, rawWpm));
+                    errorHistory.add(new ErrorSnapshot(elapsedSeconds, totalErrors));
+
+                    System.out.println("Second " + elapsedSeconds + ": WPM=" + String.format("%.1f", wpm) +
+                            ", Raw=" + String.format("%.1f", rawWpm) + ", Errors=" + totalErrors);
+
                     remainingSeconds--;
                     timerLabel.setText(String.valueOf(remainingSeconds));
-
-                    int elapsedSeconds = selectedTime - remainingSeconds;
-                    if (elapsedSeconds > 0 && cumulativeTotalChars > 0) {
-                        double minutes = elapsedSeconds / 60.0;
-                        double wpm = (cumulativeCorrectChars / 5.0) / minutes;
-                        double rawWpm = (cumulativeTotalChars / 5.0) / minutes;
-
-                        wpmHistory.add(new WPMSnapshot(elapsedSeconds, wpm, rawWpm));
-
-                        int errors = cumulativeMissedChars + cumulativeExtraChars;
-                        errorHistory.add(new ErrorSnapshot(elapsedSeconds, errors));
-                    }
 
                     if (remainingSeconds <= 0) {
                         endTest();
@@ -867,30 +943,18 @@ public class TypingSpeedApp extends Application {
 
         inputField.setDisable(true);
 
-        String typedText = inputField.getText();
-        int correctInChunk = 0;
-        int missedInChunk = 0;
-        int extraInChunk = 0;
+        cumulativeCorrectChars += currentChunkCorrect;
+        cumulativeTotalChars += currentChunkTotal;
+        cumulativeMissedChars += currentChunkMissed;
+        cumulativeExtraChars += currentChunkExtra;
 
-        int matchLength = Math.min(currentSentence.length(), typedText.length());
-        for (int i = 0; i < matchLength; i++) {
-            if (currentSentence.charAt(i) == typedText.charAt(i)) {
-                correctInChunk++;
-            } else {
-                missedInChunk++;
-            }
-        }
+        System.out.println("Test ended. Final stats:");
+        System.out.println("  Cumulative correct: " + cumulativeCorrectChars);
+        System.out.println("  Cumulative total: " + cumulativeTotalChars);
+        System.out.println("  WPM history size: " + wpmHistory.size());
+        System.out.println("  Error history size: " + errorHistory.size());
 
-        if (typedText.length() > currentSentence.length()) {
-            extraInChunk = typedText.length() - currentSentence.length();
-        }
-
-        cumulativeCorrectChars += correctInChunk;
-        cumulativeTotalChars += typedText.length();
-        cumulativeMissedChars += missedInChunk;
-        cumulativeExtraChars += extraInChunk;
-
-        textAreaSection.setVisible(false);
+        mainTypingArea.setVisible(false); // MODIFIED
         resultsPanel.setVisible(true);
         showResults();
     }
