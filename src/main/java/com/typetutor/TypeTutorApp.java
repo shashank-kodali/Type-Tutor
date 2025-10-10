@@ -1,4 +1,4 @@
-package org.example;
+package com.typetutor;
 
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -24,7 +24,7 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
-public class TypeTutor extends Application {
+public class TypeTutorApp extends Application {
 
     private static final String BG_COLOR = "#323437";
     private static final String SUB_ALT_COLOR = "#2c2e31";
