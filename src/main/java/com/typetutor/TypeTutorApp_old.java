@@ -24,7 +24,7 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
-public class TypeTutorApp extends Application {
+public class TypeTutorApp_old extends Application {
 
     private static final String BG_COLOR = "#323437";
     private static final String SUB_ALT_COLOR = "#2c2e31";
