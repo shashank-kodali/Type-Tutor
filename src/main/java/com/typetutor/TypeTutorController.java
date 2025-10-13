@@ -4,6 +4,7 @@ import javafx.application.Platform;
 import javafx.scene.control.DialogPane;
 import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.ToggleButton;
+import java.sql.SQLException;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -11,24 +12,57 @@ public class TypeTutorController {
 
     private final TypeTutorModel model;
     private final TypeTutorView view;
+    private final DatabaseManager dbManager;  // NEW: Database manager
     private Timer gameTimer;
+    private int currentUserId = -1;  // NEW: Track current user
 
-    public TypeTutorController(TypeTutorModel model, TypeTutorView view) {
+    public TypeTutorController(TypeTutorModel model, TypeTutorView view, DatabaseManager dbManager) {
         this.model = model;
         this.view = view;
+        this.dbManager = dbManager;  // NEW: Initialize database manager
+
+        // NEW: Prompt for username on startup
+        promptForUsername();
+
         attachEventHandlers();
 
-        // Show initial placeholder text immediately
         model.prepareLongText();
         model.loadNewSentence();
         view.displaySentence(model.getCurrentSentence(), "");
 
-        // Then load better text asynchronously in the background
         model.loadTextsAsync().thenRun(() -> Platform.runLater(() -> {
             model.prepareLongText();
             model.loadNewSentence();
             view.displaySentence(model.getCurrentSentence(), "");
         }));
+    }
+
+    // NEW: Prompt user to enter username
+    private void promptForUsername() {
+        TextInputDialog dialog = new TextInputDialog("Guest");
+        dialog.setTitle("Welcome to Type Tutor");
+        dialog.setHeaderText("Enter your username to track your progress:");
+        dialog.setContentText("Username:");
+
+        DialogPane dialogPane = dialog.getDialogPane();
+        dialogPane.setStyle("-fx-background-color: #323437;");
+        dialogPane.lookup(".content.label").setStyle("-fx-text-fill: #d1d0c5;");
+
+        dialog.showAndWait().ifPresent(username -> {
+            try {
+                currentUserId = dbManager.getOrCreateUser(username);
+                System.out.println("Logged in as: " + username + " (ID: " + currentUserId + ")");
+
+                // Show user statistics
+                DatabaseManager.UserStatistics stats = dbManager.getUserStatistics(currentUserId);
+                if (stats != null && stats.totalTests > 0) {
+                    System.out.println("Your Stats: " + stats);
+                }
+            } catch (SQLException e) {
+                System.err.println("Error creating/loading user: " + e.getMessage());
+                currentUserId = -1;
+            }
+        });
     }
 
     private void attachEventHandlers() {
@@ -175,7 +209,31 @@ public class TypeTutorController {
         System.out.println("  Final Accuracy: " + String.format("%.1f%%", finalAccuracy));
         System.out.println("==================\n");
 
+        // NEW: Save test result to database
+        saveTestToDatabase();
+
         view.showResults(model, e -> handleNextTest());
+    }
+
+    // NEW: Save test result to database
+    private void saveTestToDatabase() {
+        if (currentUserId != -1) {
+            try {
+                int resultId = dbManager.saveTestResult(currentUserId, model);
+                System.out.println("Test result saved to database (ID: " + resultId + ")");
+
+                // Print updated user statistics
+                DatabaseManager.UserStatistics stats = dbManager.getUserStatistics(currentUserId);
+                if (stats != null) {
+                    System.out.println("Updated Stats: " + stats);
+                }
+            } catch (SQLException e) {
+                System.err.println("Error saving test result: " + e.getMessage());
+                e.printStackTrace();
+            }
+        } else {
+            System.out.println("No user logged in - test result not saved");
+        }
     }
 
     private void handleNextTest() {
@@ -195,7 +253,6 @@ public class TypeTutorController {
             int[] stats = processCharacterComparison(typedText, false);
             model.processCompletedSentence(stats[0], stats[1], stats[2], stats[3]);
 
-            // FIXED: Immediately display the new sentence after completion
             Platform.runLater(() -> {
                 view.getInputField().clear();
                 view.displaySentence(model.getCurrentSentence(), "");
