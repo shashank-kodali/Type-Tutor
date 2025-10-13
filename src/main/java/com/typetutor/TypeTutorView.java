@@ -36,6 +36,7 @@ public class TypeTutorView {
     private ToggleGroup difficultyGroup;
     private ToggleGroup timerGroup;
     private VBox mainTypingArea;
+    private ScrollPane resultsScrollPane;  // CHANGED: Use ScrollPane instead of VBox
     private VBox resultsPanel;
 
     public TextField getInputField() { return inputField; }
@@ -102,7 +103,7 @@ public class TypeTutorView {
 
     public void prepareForNewTest(int selectedTime) {
         Platform.runLater(() -> {
-            resultsPanel.setVisible(false);
+            resultsScrollPane.setVisible(false);
             mainTypingArea.setVisible(true);
             timerLabel.setText(String.valueOf(selectedTime));
             inputField.clear();
@@ -138,47 +139,49 @@ public class TypeTutorView {
             double accuracy = model.getCumulativeTotalChars() > 0 ? (model.getCumulativeCorrectChars() * 100.0 / model.getCumulativeTotalChars()) : 0;
             double consistency = model.calculateConsistency();
 
-            HBox mainResultsBox = new HBox(60);
+            HBox mainResultsBox = new HBox(40);  // Reduced from 60 to 40
             mainResultsBox.setAlignment(Pos.CENTER);
-            mainResultsBox.setPadding(new Insets(20));
+            mainResultsBox.setPadding(new Insets(10, 0, 10, 0));  // Reduced padding
 
-            VBox leftStats = new VBox(45);
+            VBox leftStats = new VBox(30);  // Reduced from 45 to 30
             leftStats.setAlignment(Pos.CENTER_LEFT);
-            leftStats.setPadding(new Insets(40));
+            leftStats.setPadding(new Insets(20));  // Reduced from 40 to 20
 
-            VBox wpmBox = new VBox(12);
+            VBox wpmBox = new VBox(8);  // Reduced from 12 to 8
             wpmBox.setAlignment(Pos.CENTER_LEFT);
             Label wpmLabel = new Label("wpm");
-            wpmLabel.setFont(new Font("Lexend Deca", 32));
+            wpmLabel.setFont(new Font("Lexend Deca", 24));  // Reduced from 32 to 24
             wpmLabel.setStyle("-fx-text-fill: " + SUB_COLOR + ";");
             Label wpmValue = new Label(String.format("%.0f", wpm));
-            wpmValue.setFont(new Font("Lexend Deca", 135));
+            wpmValue.setFont(new Font("Lexend Deca", 70));  // Reduced from 135 to 100
             wpmValue.setStyle("-fx-text-fill: " + CARET_COLOR + "; -fx-font-weight: bold;");
             wpmBox.getChildren().addAll(wpmLabel, wpmValue);
 
-            VBox accBox = new VBox(12);
+            VBox accBox = new VBox(8);  // Reduced from 12 to 8
             accBox.setAlignment(Pos.CENTER_LEFT);
             Label accLabel = new Label("acc");
-            accLabel.setFont(new Font("Lexend Deca", 32));
+            accLabel.setFont(new Font("Lexend Deca", 24));  // Reduced from 32 to 24
             accLabel.setStyle("-fx-text-fill: " + SUB_COLOR + ";");
             Label accValue = new Label(String.format("%.0f%%", accuracy));
-            accValue.setFont(new Font("Lexend Deca", 135));
+            accValue.setFont(new Font("Lexend Deca", 70));  // Reduced from 135 to 100
             accValue.setStyle("-fx-text-fill: " + CARET_COLOR + "; -fx-font-weight: bold;");
             accBox.getChildren().addAll(accLabel, accValue);
 
             leftStats.getChildren().addAll(wpmBox, accBox);
 
             LineChart<Number, Number> chart = createCombinedChart(model);
-            chart.setPrefWidth(900);
-            chart.setPrefHeight(675);
-            chart.setMaxHeight(675);
+            chart.setPrefWidth(550);  // Reduced from 900 to 700
+            chart.setPrefHeight(300);  // Reduced from 675 to 450
+            chart.setMaxHeight(450);
+
             mainResultsBox.getChildren().addAll(leftStats, chart);
 
             GridPane metricsGrid = new GridPane();
             metricsGrid.setAlignment(Pos.CENTER);
-            metricsGrid.setHgap(90);
+            metricsGrid.setHgap(60);  // Reduced from 90 to 60
             metricsGrid.setVgap(0);
-            metricsGrid.setPadding(new Insets(20, 0, 20, 0));
+            metricsGrid.setPadding(new Insets(15, 0, 15, 0));  // Reduced from 20 to 15
+
             String diffName = model.getCurrentDifficulty().name().toLowerCase();
             addMetricToGrid(metricsGrid, 0, "test type", String.format("time %d\n%s", model.getSelectedTime(), diffName));
             addMetricToGrid(metricsGrid, 1, "raw", String.format("%.0f", rawWpm));
@@ -187,17 +190,21 @@ public class TypeTutorView {
             addMetricToGrid(metricsGrid, 4, "time", String.format("%ds", model.getSelectedTime()));
 
             Button nextTestButton = new Button("next test");
-            nextTestButton.setFont(new Font("Lexend Deca", 32));
-            nextTestButton.setPrefWidth(270);
-            nextTestButton.setPrefHeight(90);
+            nextTestButton.setFont(new Font("Lexend Deca", 28));  // Reduced from 32 to 28
+            nextTestButton.setPrefWidth(240);  // Reduced from 270 to 240
+            nextTestButton.setPrefHeight(70);  // Reduced from 90 to 70
             nextTestButton.setStyle("-fx-background-color: " + SUB_COLOR + "; -fx-text-fill: " + MAIN_COLOR + "; -fx-background-radius: 18; -fx-font-weight: 500; -fx-border-color: transparent; -fx-cursor: hand;");
             nextTestButton.setOnMouseEntered(e -> nextTestButton.setStyle("-fx-background-color: " + MAIN_COLOR + "; -fx-text-fill: " + BG_COLOR + "; -fx-background-radius: 18; -fx-font-weight: 600; -fx-border-color: transparent; -fx-cursor: hand;"));
             nextTestButton.setOnMouseExited(e -> nextTestButton.setStyle("-fx-background-color: " + SUB_COLOR + "; -fx-text-fill: " + MAIN_COLOR + "; -fx-background-radius: 18; -fx-font-weight: 500; -fx-border-color: transparent; -fx-cursor: hand;"));
             nextTestButton.setOnAction(nextTestHandler);
 
             resultsPanel.getChildren().addAll(mainResultsBox, metricsGrid, nextTestButton);
+
+            // Scroll to top when results are shown
+            resultsScrollPane.setVvalue(0);
+
             mainTypingArea.setVisible(false);
-            resultsPanel.setVisible(true);
+            resultsScrollPane.setVisible(true);
         });
     }
 
@@ -205,9 +212,17 @@ public class TypeTutorView {
         StackPane centerStackPane = new StackPane();
         centerStackPane.setAlignment(Pos.CENTER);
         mainTypingArea = createMainTypingArea();
+
+        // FIXED: Wrap results panel in ScrollPane
         resultsPanel = createResultsPanel();
-        resultsPanel.setVisible(false);
-        centerStackPane.getChildren().addAll(mainTypingArea, resultsPanel);
+        resultsScrollPane = new ScrollPane(resultsPanel);
+        resultsScrollPane.setStyle("-fx-background: " + BG_COLOR + "; -fx-background-color: " + BG_COLOR + ";");
+        resultsScrollPane.setFitToWidth(true);
+        resultsScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        resultsScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        resultsScrollPane.setVisible(false);
+
+        centerStackPane.getChildren().addAll(mainTypingArea, resultsScrollPane);
         return centerStackPane;
     }
 
@@ -260,10 +275,10 @@ public class TypeTutorView {
         StackPane inputPane = new StackPane(inputField);
         StackPane buttonPane = new StackPane(startButton);
 
-        sentencePane.setPadding(new Insets(100, 0, 200, 0));
-        buttonPane.setPadding(new Insets(20, 0, 0, 0));
+        sentencePane.setPadding(new Insets(0, 0, 30, 0));
+        buttonPane.setPadding(new Insets(15, 0, 0, 0));
 
-        VBox typingArea = new VBox();
+        VBox typingArea = new VBox(15);
         typingArea.setAlignment(Pos.CENTER);
         typingArea.setPrefWidth(750);
         typingArea.setMaxWidth(750);
@@ -272,9 +287,9 @@ public class TypeTutorView {
     }
 
     private VBox createResultsPanel() {
-        VBox panel = new VBox(45);
+        VBox panel = new VBox(30);  // Reduced from 45 to 30
         panel.setAlignment(Pos.CENTER);
-        panel.setPadding(new Insets(30));
+        panel.setPadding(new Insets(20));  // Reduced from 30 to 20
         return panel;
     }
 
@@ -386,15 +401,15 @@ public class TypeTutorView {
     }
 
     private void addMetricToGrid(GridPane grid, int col, String label, String value) {
-        VBox metricBox = new VBox(9);
+        VBox metricBox = new VBox(6);  // Reduced from 9 to 6
         metricBox.setAlignment(Pos.CENTER);
 
         Label labelLabel = new Label(label);
-        labelLabel.setFont(new Font("Lexend Deca", 27));
+        labelLabel.setFont(new Font("Lexend Deca", 20));  // Reduced from 27 to 20
         labelLabel.setStyle("-fx-text-fill: " + SUB_COLOR + ";");
 
         Label valueLabel = new Label(value);
-        valueLabel.setFont(new Font("Lexend Deca", 40));
+        valueLabel.setFont(new Font("Lexend Deca", 30));  // Reduced from 40 to 30
         valueLabel.setStyle("-fx-text-fill: " + MAIN_COLOR + "; -fx-font-weight: 500;");
         valueLabel.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
 
@@ -436,54 +451,29 @@ public class TypeTutorView {
         chart.getData().addAll(wpmSeries, errorSeries);
 
         Platform.runLater(() -> {
-            // Style WPM series (series0) with yellow
             for (XYChart.Data<Number, Number> data : wpmSeries.getData()) {
-                Circle circle = new Circle(6.75);
+                Circle circle = new Circle(5);  // Reduced from 6.75 to 5
                 circle.setFill(Color.web(CARET_COLOR));
                 data.setNode(circle);
             }
-            // Style Error series (series1) with red
             for (XYChart.Data<Number, Number> data : errorSeries.getData()) {
-                Circle circle = new Circle(6.75);
+                Circle circle = new Circle(5);  // Reduced from 6.75 to 5
                 circle.setFill(Color.web(ERROR_COLOR));
                 data.setNode(circle);
             }
-
-            // Apply line colors
             chart.lookupAll(".chart-series-line").forEach(node -> {
                 if (node.getStyleClass().contains("series0")) {
-                    node.setStyle("-fx-stroke: " + CARET_COLOR + "; -fx-stroke-width: 4.5px;");
+                    node.setStyle("-fx-stroke: " + CARET_COLOR + "; -fx-stroke-width: 3.5px;");  // Reduced from 4.5px
                 } else if (node.getStyleClass().contains("series1")) {
-                    node.setStyle("-fx-stroke: " + ERROR_COLOR + "; -fx-stroke-width: 4.5px;");
-                }
-            });
-
-            // FIXED: Apply correct colors to legend labels
-            chart.lookupAll(".chart-legend-item").forEach(node -> {
-                if (node instanceof Label) {
-                    Label legendLabel = (Label) node;
-                    if (legendLabel.getText().equals("wpm")) {
-                        legendLabel.setGraphic(createLegendSymbol(CARET_COLOR));
-                        legendLabel.setStyle("-fx-text-fill: " + MAIN_COLOR + ";");
-                    } else if (legendLabel.getText().equals("errors")) {
-                        legendLabel.setGraphic(createLegendSymbol(ERROR_COLOR));
-                        legendLabel.setStyle("-fx-text-fill: " + MAIN_COLOR + ";");
-                    }
+                    node.setStyle("-fx-stroke: " + ERROR_COLOR + "; -fx-stroke-width: 3.5px;");  // Reduced from 4.5px
                 }
             });
         });
         return chart;
     }
 
-    private Region createLegendSymbol(String color) {
-        Region symbol = new Region();
-        symbol.setPrefSize(15, 15);
-        symbol.setStyle("-fx-background-color: " + color + "; -fx-background-radius: 7.5;");
-        return symbol;
-    }
-
     private void styleChart(LineChart<Number, Number> chart) {
-        chart.setStyle("-fx-background-color: transparent; -fx-font-size: 22px;");
+        chart.setStyle("-fx-background-color: transparent; -fx-font-size: 18px;");  // Reduced from 22px to 18px
         Platform.runLater(() -> {
             if (chart.lookup(".chart-plot-background") != null) {
                 chart.lookup(".chart-plot-background").setStyle("-fx-background-color: " + SUB_ALT_COLOR + ";");
@@ -493,7 +483,7 @@ public class TypeTutorView {
     }
 
     private void styleAxis(NumberAxis axis) {
-        axis.setStyle("-fx-tick-label-fill: " + SUB_COLOR + "; -fx-font-size: 22px;");
+        axis.setStyle("-fx-tick-label-fill: " + SUB_COLOR + "; -fx-font-size: 18px;");  // Reduced from 22px to 18px
         axis.setTickLabelFill(Color.web(SUB_COLOR));
     }
 }
