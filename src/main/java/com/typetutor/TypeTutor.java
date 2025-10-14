@@ -10,7 +10,7 @@ public class TypeTutor extends Application {
     @Override
     public void start(Stage primaryStage) {
         // NEW: Initialize database (choose "sqlite" or "mysql")
-        dbManager = new DatabaseManager("mysql");  // Use SQLite for simplicity
+        dbManager = new DatabaseManager();  // Use SQLite for simplicity
 
         // Create the Model to hold the application's data and state
         TypeTutorModel model = new TypeTutorModel();

@@ -8,15 +8,11 @@ import java.util.List;
 
 /**
  * DatabaseManager handles all database operations for Type Tutor
- * Supports both SQLite (embedded) and MySQL (server-based)
+ * MySQL database only
  */
 public class DatabaseManager {
 
     private Connection connection;
-    private final String dbType; // "sqlite" or "mysql"
-
-    // SQLite Configuration
-    private static final String SQLITE_URL = "jdbc:sqlite:typetutor.db";
 
     // MySQL Configuration (modify these for your setup)
     private static final String MYSQL_URL = "jdbc:mysql://localhost:3306/typetutor_db";
@@ -25,14 +21,12 @@ public class DatabaseManager {
 
     /**
      * Constructor - Initialize database connection
-     * @param dbType "sqlite" or "mysql"
      */
-    public DatabaseManager(String dbType) {
-        this.dbType = dbType.toLowerCase();
+    public DatabaseManager() {
         try {
             connectToDatabase();
             createTables();
-            System.out.println("Database initialized successfully: " + dbType);
+            System.out.println("Database initialized successfully");
         } catch (SQLException e) {
             System.err.println("Database initialization failed: " + e.getMessage());
             e.printStackTrace();
@@ -43,15 +37,7 @@ public class DatabaseManager {
      * Establish database connection
      */
     private void connectToDatabase() throws SQLException {
-        if (dbType.equals("sqlite")) {
-            // SQLite - No external server needed
-            connection = DriverManager.getConnection(SQLITE_URL);
-        } else if (dbType.equals("mysql")) {
-            // MySQL - Requires MySQL server running
-            connection = DriverManager.getConnection(MYSQL_URL, MYSQL_USER, MYSQL_PASSWORD);
-        } else {
-            throw new SQLException("Unsupported database type: " + dbType);
-        }
+        connection = DriverManager.getConnection(MYSQL_URL, MYSQL_USER, MYSQL_PASSWORD);
     }
 
     /**
@@ -62,14 +48,14 @@ public class DatabaseManager {
 
         // Users table
         String createUsersTable = "CREATE TABLE IF NOT EXISTS users (" +
-                "user_id INTEGER PRIMARY KEY " + (dbType.equals("sqlite") ? "AUTOINCREMENT" : "AUTO_INCREMENT") + ", " +
+                "user_id INTEGER PRIMARY KEY AUTO_INCREMENT, " +
                 "username VARCHAR(50) UNIQUE NOT NULL, " +
                 "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
                 ")";
 
         // Test results table
         String createResultsTable = "CREATE TABLE IF NOT EXISTS test_results (" +
-                "result_id INTEGER PRIMARY KEY " + (dbType.equals("sqlite") ? "AUTOINCREMENT" : "AUTO_INCREMENT") + ", " +
+                "result_id INTEGER PRIMARY KEY AUTO_INCREMENT, " +
                 "user_id INTEGER, " +
                 "test_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
                 "difficulty VARCHAR(20), " +
@@ -87,7 +73,7 @@ public class DatabaseManager {
 
         // WPM history table (for graph data)
         String createWpmHistoryTable = "CREATE TABLE IF NOT EXISTS wpm_history (" +
-                "history_id INTEGER PRIMARY KEY " + (dbType.equals("sqlite") ? "AUTOINCREMENT" : "AUTO_INCREMENT") + ", " +
+                "history_id INTEGER PRIMARY KEY AUTO_INCREMENT, " +
                 "result_id INTEGER, " +
                 "second INTEGER, " +
                 "wpm DECIMAL(5,2), " +
@@ -97,7 +83,7 @@ public class DatabaseManager {
 
         // Error history table
         String createErrorHistoryTable = "CREATE TABLE IF NOT EXISTS error_history (" +
-                "error_id INTEGER PRIMARY KEY " + (dbType.equals("sqlite") ? "AUTOINCREMENT" : "AUTO_INCREMENT") + ", " +
+                "error_id INTEGER PRIMARY KEY AUTO_INCREMENT, " +
                 "result_id INTEGER, " +
                 "second INTEGER, " +
                 "error_count INTEGER, " +
