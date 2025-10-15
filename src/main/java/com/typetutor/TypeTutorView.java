@@ -138,76 +138,99 @@ public class TypeTutorView {
             double accuracy = model.getCumulativeTotalChars() > 0 ? (model.getCumulativeCorrectChars() * 100.0 / model.getCumulativeTotalChars()) : 0;
             double consistency = model.calculateConsistency();
 
-            // REDUCED: Main results box with tighter spacing
-            HBox mainResultsBox = new HBox(30);
+            // Main layout - WPM/ACC on left, Chart on right
+            HBox mainResultsBox = new HBox(40);
             mainResultsBox.setAlignment(Pos.CENTER);
-            mainResultsBox.setPadding(new Insets(5, 0, 5, 0));
+            mainResultsBox.setPadding(new Insets(10, 0, 10, 0));
 
-            // REDUCED: Left stats with smaller fonts and spacing
-            VBox leftStats = new VBox(20);
+            // Left side - WPM and Accuracy
+            VBox leftStats = new VBox(35);
             leftStats.setAlignment(Pos.CENTER_LEFT);
-            leftStats.setPadding(new Insets(10));
+            leftStats.setPadding(new Insets(20));
 
             VBox wpmBox = new VBox(5);
             wpmBox.setAlignment(Pos.CENTER_LEFT);
             Label wpmLabel = new Label("wpm");
-            wpmLabel.setFont(new Font("Lexend Deca", 20));
-            wpmLabel.setStyle("-fx-text-fill: " + SUB_COLOR + ";");
+            wpmLabel.setFont(new Font("Lexend Deca", 22));
+            wpmLabel.setStyle("-fx-text-fill: " + SUB_COLOR + "; -fx-font-weight: 300;");
             Label wpmValue = new Label(String.format("%.0f", wpm));
-            wpmValue.setFont(new Font("Lexend Deca", 60));
-            wpmValue.setStyle("-fx-text-fill: " + CARET_COLOR + "; -fx-font-weight: bold;");
+            wpmValue.setFont(new Font("Lexend Deca", 80));
+            wpmValue.setStyle("-fx-text-fill: " + CARET_COLOR + "; -fx-font-weight: 500;");
             wpmBox.getChildren().addAll(wpmLabel, wpmValue);
 
             VBox accBox = new VBox(5);
             accBox.setAlignment(Pos.CENTER_LEFT);
             Label accLabel = new Label("acc");
-            accLabel.setFont(new Font("Lexend Deca", 20));
-            accLabel.setStyle("-fx-text-fill: " + SUB_COLOR + ";");
+            accLabel.setFont(new Font("Lexend Deca", 22));
+            accLabel.setStyle("-fx-text-fill: " + SUB_COLOR + "; -fx-font-weight: 300;");
             Label accValue = new Label(String.format("%.0f%%", accuracy));
-            accValue.setFont(new Font("Lexend Deca", 60));
-            accValue.setStyle("-fx-text-fill: " + CARET_COLOR + "; -fx-font-weight: bold;");
+            accValue.setFont(new Font("Lexend Deca", 80));
+            accValue.setStyle("-fx-text-fill: " + CARET_COLOR + "; -fx-font-weight: 500;");
             accBox.getChildren().addAll(accLabel, accValue);
 
             leftStats.getChildren().addAll(wpmBox, accBox);
 
-            // REDUCED: Smaller chart
-            LineChart<Number, Number> chart = createCombinedChart(model);
-            chart.setPrefWidth(500);
-            chart.setPrefHeight(280);
-            chart.setMaxHeight(280);
+            // Right side - Chart (larger)
+            LineChart<Number, Number> chart = createMonkeytypeChart(model);
+            chart.setPrefWidth(700);
+            chart.setPrefHeight(320);
+            chart.setMaxHeight(320);
 
             mainResultsBox.getChildren().addAll(leftStats, chart);
 
-            // REDUCED: Metrics grid with smaller fonts
-            GridPane metricsGrid = new GridPane();
-            metricsGrid.setAlignment(Pos.CENTER);
-            metricsGrid.setHgap(50);
-            metricsGrid.setVgap(0);
-            metricsGrid.setPadding(new Insets(10, 0, 10, 0));
+            // Bottom metrics - Single horizontal row (like Monkeytype)
+            HBox metricsRow = new HBox(60);
+            metricsRow.setAlignment(Pos.CENTER);
+            metricsRow.setPadding(new Insets(10, 0, 10, 0));
 
             String diffName = model.getCurrentDifficulty().name().toLowerCase();
-            addMetricToGrid(metricsGrid, 0, "test type", String.format("time %d\n%s", model.getSelectedTime(), diffName));
-            addMetricToGrid(metricsGrid, 1, "raw", String.format("%.0f", rawWpm));
-            addMetricToGrid(metricsGrid, 2, "characters", String.format("%d/%d/%d/%d", model.getCumulativeCorrectChars(), model.getCumulativeMissedChars(), model.getCumulativeExtraChars(), 0));
-            addMetricToGrid(metricsGrid, 3, "consistency", String.format("%.0f%%", consistency));
-            addMetricToGrid(metricsGrid, 4, "time", String.format("%ds", model.getSelectedTime()));
+            metricsRow.getChildren().addAll(
+                    createMetricBox("test type", String.format("time %d\n%s", model.getSelectedTime(), diffName)),
+                    createMetricBox("raw", String.format("%.0f", rawWpm)),
+                    createMetricBox("characters", String.format("%d/%d/%d/%d",
+                            model.getCumulativeCorrectChars(),
+                            model.getCumulativeMissedChars(),
+                            model.getCumulativeExtraChars(), 0)),
+                    createMetricBox("consistency", String.format("%.0f%%", consistency)),
+                    createMetricBox("time", String.format("%ds", model.getSelectedTime()))
+            );
 
-            // REDUCED: Smaller button
+            // Next test button (smaller, less prominent)
             Button nextTestButton = new Button("next test");
-            nextTestButton.setFont(new Font("Lexend Deca", 24));
-            nextTestButton.setPrefWidth(200);
-            nextTestButton.setPrefHeight(55);
-            nextTestButton.setStyle("-fx-background-color: " + SUB_COLOR + "; -fx-text-fill: " + MAIN_COLOR + "; -fx-background-radius: 18; -fx-font-weight: 500; -fx-border-color: transparent; -fx-cursor: hand;");
-            nextTestButton.setOnMouseEntered(e -> nextTestButton.setStyle("-fx-background-color: " + MAIN_COLOR + "; -fx-text-fill: " + BG_COLOR + "; -fx-background-radius: 18; -fx-font-weight: 600; -fx-border-color: transparent; -fx-cursor: hand;"));
-            nextTestButton.setOnMouseExited(e -> nextTestButton.setStyle("-fx-background-color: " + SUB_COLOR + "; -fx-text-fill: " + MAIN_COLOR + "; -fx-background-radius: 18; -fx-font-weight: 500; -fx-border-color: transparent; -fx-cursor: hand;"));
+            nextTestButton.setFont(new Font("Lexend Deca", 16));
+            nextTestButton.setPrefWidth(140);
+            nextTestButton.setPrefHeight(40);
+            nextTestButton.setStyle("-fx-background-color: " + SUB_ALT_COLOR + "; -fx-text-fill: " + SUB_COLOR + "; -fx-background-radius: 8; -fx-font-weight: 400; -fx-border-color: transparent; -fx-cursor: hand;");
+            nextTestButton.setOnMouseEntered(e -> nextTestButton.setStyle("-fx-background-color: " + SUB_COLOR + "; -fx-text-fill: " + MAIN_COLOR + "; -fx-background-radius: 8; -fx-font-weight: 500; -fx-border-color: transparent; -fx-cursor: hand;"));
+            nextTestButton.setOnMouseExited(e -> nextTestButton.setStyle("-fx-background-color: " + SUB_ALT_COLOR + "; -fx-text-fill: " + SUB_COLOR + "; -fx-background-radius: 8; -fx-font-weight: 400; -fx-border-color: transparent; -fx-cursor: hand;"));
             nextTestButton.setOnAction(nextTestHandler);
 
-            // REDUCED: Tighter vertical spacing
-            resultsPanel.getChildren().addAll(mainResultsBox, metricsGrid, nextTestButton);
+            HBox buttonBox = new HBox(nextTestButton);
+            buttonBox.setAlignment(Pos.CENTER);
+            buttonBox.setPadding(new Insets(15, 0, 0, 0));
+
+            resultsPanel.getChildren().addAll(mainResultsBox, metricsRow, buttonBox);
 
             mainTypingArea.setVisible(false);
             resultsPanel.setVisible(true);
         });
+    }
+
+    private VBox createMetricBox(String label, String value) {
+        VBox box = new VBox(6);
+        box.setAlignment(Pos.CENTER);
+
+        Label labelLabel = new Label(label);
+        labelLabel.setFont(new Font("Lexend Deca", 14));
+        labelLabel.setStyle("-fx-text-fill: " + SUB_COLOR + "; -fx-font-weight: 300;");
+
+        Label valueLabel = new Label(value);
+        valueLabel.setFont(new Font("Lexend Deca", 22));
+        valueLabel.setStyle("-fx-text-fill: " + CARET_COLOR + "; -fx-font-weight: 500;");
+        valueLabel.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
+
+        box.getChildren().addAll(labelLabel, valueLabel);
+        return box;
     }
 
     private StackPane createCenterStackPane() {
@@ -281,7 +304,7 @@ public class TypeTutorView {
     }
 
     private VBox createResultsPanel() {
-        VBox panel = new VBox(20);
+        VBox panel = new VBox(10);
         panel.setAlignment(Pos.CENTER);
         panel.setPadding(new Insets(10));
         return panel;
@@ -394,111 +417,70 @@ public class TypeTutorView {
         return separator;
     }
 
-    private void addMetricToGrid(GridPane grid, int col, String label, String value) {
-        VBox metricBox = new VBox(4);
-        metricBox.setAlignment(Pos.CENTER);
-
-        Label labelLabel = new Label(label);
-        labelLabel.setFont(new Font("Lexend Deca", 16));
-        labelLabel.setStyle("-fx-text-fill: " + SUB_COLOR + ";");
-
-        Label valueLabel = new Label(value);
-        valueLabel.setFont(new Font("Lexend Deca", 24));
-        valueLabel.setStyle("-fx-text-fill: " + MAIN_COLOR + "; -fx-font-weight: 500;");
-        valueLabel.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
-
-        metricBox.getChildren().addAll(labelLabel, valueLabel);
-        grid.add(metricBox, col, 0);
-    }
-
-    private LineChart<Number, Number> createCombinedChart(TypeTutorModel model) {
+    private LineChart<Number, Number> createMonkeytypeChart(TypeTutorModel model) {
         NumberAxis xAxis = new NumberAxis();
         xAxis.setLabel("");
         xAxis.setAutoRanging(false);
         xAxis.setLowerBound(0);
         xAxis.setUpperBound(model.getSelectedTime());
         xAxis.setTickUnit(Math.max(model.getSelectedTime() / 6.0, 5));
-        styleAxis(xAxis);
+        xAxis.setStyle("-fx-tick-label-fill: " + SUB_COLOR + "; -fx-font-size: 12px;");
+        xAxis.setTickLabelFill(Color.web(SUB_COLOR));
 
         NumberAxis yAxis = new NumberAxis();
         yAxis.setLabel("");
         yAxis.setAutoRanging(true);
-        styleAxis(yAxis);
+        yAxis.setStyle("-fx-tick-label-fill: " + SUB_COLOR + "; -fx-font-size: 12px;");
+        yAxis.setTickLabelFill(Color.web(SUB_COLOR));
 
         LineChart<Number, Number> chart = new LineChart<>(xAxis, yAxis);
-        chart.setLegendVisible(true);
-        chart.setCreateSymbols(true);
-        styleChart(chart);
+        chart.setLegendVisible(false);
+        chart.setCreateSymbols(false);
+        chart.setStyle("-fx-background-color: " + BG_COLOR + "; -fx-font-size: 12px;");
 
-        // Create series with explicit names
+        // WPM line series
         XYChart.Series<Number, Number> wpmSeries = new XYChart.Series<>();
         wpmSeries.setName("wpm");
-        XYChart.Series<Number, Number> errorSeries = new XYChart.Series<>();
-        errorSeries.setName("errors");
 
-        // Populate data
         for (TypeTutorModel.WPMSnapshot snapshot : model.getWpmHistory()) {
             wpmSeries.getData().add(new XYChart.Data<>(snapshot.second, snapshot.wpm));
         }
+
+        // Error line series
+        XYChart.Series<Number, Number> errorSeries = new XYChart.Series<>();
+        errorSeries.setName("errors");
+
         for (TypeTutorModel.ErrorSnapshot snapshot : model.getErrorHistory()) {
             errorSeries.getData().add(new XYChart.Data<>(snapshot.second, snapshot.errors));
         }
 
-        // Add series to chart (order matters for styling)
         chart.getData().addAll(wpmSeries, errorSeries);
 
-        // Style the chart elements after rendering
         Platform.runLater(() -> {
-            // Style WPM series (series0) with yellow/CARET_COLOR
-            for (XYChart.Data<Number, Number> data : wpmSeries.getData()) {
-                Circle circle = new Circle(4);
-                circle.setFill(Color.web(CARET_COLOR));
-                data.setNode(circle);
-            }
-
-            // Style error series (series1) with red/ERROR_COLOR
-            for (XYChart.Data<Number, Number> data : errorSeries.getData()) {
-                Circle circle = new Circle(4);
-                circle.setFill(Color.web(ERROR_COLOR));
-                data.setNode(circle);
+            // Style chart background
+            if (chart.lookup(".chart-plot-background") != null) {
+                chart.lookup(".chart-plot-background").setStyle("-fx-background-color: " + SUB_ALT_COLOR + ";");
             }
 
             // Style the lines
             chart.lookupAll(".chart-series-line").forEach(node -> {
                 if (node.getStyleClass().contains("series0")) {
-                    // WPM line - yellow
-                    node.setStyle("-fx-stroke: " + CARET_COLOR + "; -fx-stroke-width: 3px;");
+                    // WPM line - smooth yellow
+                    node.setStyle("-fx-stroke: " + CARET_COLOR + "; -fx-stroke-width: 2.5px;");
                 } else if (node.getStyleClass().contains("series1")) {
                     // Error line - red
-                    node.setStyle("-fx-stroke: " + ERROR_COLOR + "; -fx-stroke-width: 3px;");
+                    node.setStyle("-fx-stroke: " + ERROR_COLOR + "; -fx-stroke-width: 2.5px;");
                 }
             });
 
-            // Style legend symbols to match
-            chart.lookupAll(".chart-legend-item-symbol").forEach(node -> {
-                if (node.getStyleClass().contains("series0")) {
-                    node.setStyle("-fx-background-color: " + CARET_COLOR + ";");
-                } else if (node.getStyleClass().contains("series1")) {
-                    node.setStyle("-fx-background-color: " + ERROR_COLOR + ";");
-                }
+            // Remove vertical grid lines for cleaner look
+            chart.setVerticalGridLinesVisible(false);
+            chart.setHorizontalGridLinesVisible(true);
+            chart.lookupAll(".chart-horizontal-grid-lines").forEach(node -> {
+                node.setStyle("-fx-stroke: " + SUB_COLOR + "; -fx-stroke-width: 0.5px; -fx-opacity: 0.15;");
             });
         });
 
         return chart;
-    }
-
-    private void styleChart(LineChart<Number, Number> chart) {
-        chart.setStyle("-fx-background-color: transparent; -fx-font-size: 14px;");
-        Platform.runLater(() -> {
-            if (chart.lookup(".chart-plot-background") != null) {
-                chart.lookup(".chart-plot-background").setStyle("-fx-background-color: " + SUB_ALT_COLOR + ";");
-            }
-        });
-        chart.setLegendVisible(true);
-    }
-
-    private void styleAxis(NumberAxis axis) {
-        axis.setStyle("-fx-tick-label-fill: " + SUB_COLOR + "; -fx-font-size: 14px;");
-        axis.setTickLabelFill(Color.web(SUB_COLOR));
     }
 }
