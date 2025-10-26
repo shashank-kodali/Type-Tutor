@@ -20,33 +20,35 @@ import javafx.stage.Stage;
 
 public class TypeTutorView {
 
-    private static final String BG_COLOR = "#323437";
-    private static final String SUB_ALT_COLOR = "#2c2e31";
-    private static final String SUB_COLOR = "#646669";
-    private static final String MAIN_COLOR = "#d1d0c5";
-    private static final String CARET_COLOR = "#e2b714";
-    private static final String TEXT_COLOR = "#646669";
-    private static final String ERROR_COLOR = "#ca4754";
-    private static final String ERROR_EXTRA_COLOR = "#7e2a33";
+    private ThemeManager themeManager;
+    private Theme currentTheme;
 
     private TextFlow sentenceDisplay;
     private TextField inputField;
     private Label timerLabel;
+    private Label titleLabel;
     private Button startButton;
     private ToggleGroup difficultyGroup;
     private ToggleGroup timerGroup;
+    private ToggleGroup themeGroup;
     private VBox mainTypingArea;
     private VBox resultsPanel;
+    private BorderPane root;
+    private Scene scene;
 
     public TextField getInputField() { return inputField; }
     public Button getStartButton() { return startButton; }
     public ToggleGroup getDifficultyGroup() { return difficultyGroup; }
     public ToggleGroup getTimerGroup() { return timerGroup; }
+    public ThemeManager getThemeManager() { return themeManager; }
 
-    public TypeTutorView(Stage primaryStage) {
-        BorderPane root = new BorderPane();
+    public TypeTutorView(Stage primaryStage, ThemeManager themeManager) {
+        this.themeManager = themeManager;
+        this.currentTheme = themeManager.getCurrentTheme();
+
+        root = new BorderPane();
         root.setPadding(new Insets(50, 30, 20, 30));
-        root.setStyle("-fx-background-color: " + BG_COLOR + ";");
+        applyThemeToRoot();
 
         VBox topSection = createTopSection();
         StackPane centerStackPane = createCenterStackPane();
@@ -54,10 +56,97 @@ public class TypeTutorView {
         root.setTop(topSection);
         root.setCenter(centerStackPane);
 
-        Scene scene = new Scene(root, 1200, 800);
+        scene = new Scene(root, 1200, 800);
         primaryStage.setTitle("Type Tutor");
         primaryStage.setScene(scene);
         primaryStage.show();
+    }
+
+    /**
+     * Apply theme colors to root element
+     */
+    private void applyThemeToRoot() {
+        root.setStyle("-fx-background-color: " + currentTheme.getBgColor() + ";");
+    }
+
+    /**
+     * Switch to a new theme and refresh all UI elements
+     */
+    public void applyTheme(Theme theme) {
+        this.currentTheme = theme;
+        this.themeManager.setTheme(theme);
+
+        // Refresh all UI with new theme
+        applyThemeToRoot();
+        refreshAllComponents();
+    }
+
+    /**
+     * Refresh all UI components with current theme
+     */
+    private void refreshAllComponents() {
+        // Refresh title
+        if (titleLabel != null) {
+            titleLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: " + currentTheme.getCaretColor() + ";");
+        }
+
+        // Refresh timer label
+        if (timerLabel != null) {
+            timerLabel.setStyle("-fx-text-fill: " + currentTheme.getCaretColor() + "; -fx-font-weight: 300;");
+        }
+
+        // Refresh input field
+        if (inputField != null) {
+            boolean isGameActive = startButton != null && !startButton.getText().equals("start");
+            if (inputField.isFocused() && isGameActive) {
+                inputField.setStyle("-fx-background-color: transparent; -fx-text-fill: " + currentTheme.getMainColor() +
+                        "; -fx-prompt-text-fill: " + currentTheme.getSubColor() + "; -fx-background-radius: 8; -fx-border-color: " +
+                        currentTheme.getCaretColor() + "; -fx-border-radius: 8; -fx-border-width: 2; -fx-padding: 12;");
+            } else {
+                inputField.setStyle("-fx-background-color: transparent; -fx-text-fill: " + currentTheme.getMainColor() +
+                        "; -fx-prompt-text-fill: " + currentTheme.getSubColor() + "; -fx-background-radius: 8; -fx-border-color: " +
+                        currentTheme.getSubColor() + "; -fx-border-radius: 8; -fx-border-width: 2; -fx-padding: 12;");
+            }
+        }
+
+        // Refresh start button
+        if (startButton != null) {
+            if (startButton.getText().equals("start")) {
+                startButton.setStyle("-fx-background-color: " + currentTheme.getSubColor() + "; -fx-text-fill: " +
+                        currentTheme.getBgColor() + "; -fx-background-radius: 8; -fx-font-weight: 500; -fx-border-color: transparent; -fx-cursor: hand;");
+            } else {
+                startButton.setStyle("-fx-background-color: " + currentTheme.getErrorColor() + "; -fx-text-fill: " +
+                        currentTheme.getBgColor() + "; -fx-background-radius: 8; -fx-font-weight: 500; -fx-border-color: transparent; -fx-cursor: hand;");
+            }
+        }
+
+        // Refresh all toggle buttons (difficulty, time)
+        if (difficultyGroup != null) {
+            difficultyGroup.getToggles().forEach(toggle -> {
+                ToggleButton btn = (ToggleButton) toggle;
+                updateToggleButtonStyle(btn);
+            });
+        }
+
+        if (timerGroup != null) {
+            timerGroup.getToggles().forEach(toggle -> {
+                ToggleButton btn = (ToggleButton) toggle;
+                updateToggleButtonStyle(btn);
+            });
+        }
+    }
+
+    /**
+     * Update toggle button style with current theme
+     */
+    private void updateToggleButtonStyle(ToggleButton btn) {
+        String baseStyle = "-fx-border-color: transparent; -fx-background-radius: 6; -fx-padding: 5 14; -fx-cursor: hand; -fx-font-size: 18px;";
+        if (btn.isSelected()) {
+            btn.setStyle("-fx-background-color: " + currentTheme.getCaretColor() + "; -fx-text-fill: " +
+                    currentTheme.getBgColor() + "; -fx-font-weight: 600; " + baseStyle);
+        } else {
+            btn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + currentTheme.getSubColor() + "; " + baseStyle);
+        }
     }
 
     public void displaySentence(String sentence, String typedText) {
@@ -70,16 +159,16 @@ public class TypeTutorView {
                 charText.setFont(new Font("Roboto Mono", 30));
                 if (i < matchLength) {
                     if (sentence.charAt(i) == typedText.charAt(i)) {
-                        charText.setFill(Color.web(MAIN_COLOR));
+                        charText.setFill(Color.web(currentTheme.getMainColor()));
                     } else {
-                        charText.setFill(Color.web(ERROR_COLOR));
+                        charText.setFill(Color.web(currentTheme.getErrorColor()));
                         charText.setStyle("-fx-font-weight: bold;");
                     }
                 } else if (i == matchLength && typedText.length() > 0) {
-                    charText.setFill(Color.web(CARET_COLOR));
+                    charText.setFill(Color.web(currentTheme.getCaretColor()));
                     charText.setStyle("-fx-underline: true; -fx-font-weight: bold;");
                 } else {
-                    charText.setFill(Color.web(TEXT_COLOR));
+                    charText.setFill(Color.web(currentTheme.getTextColor()));
                 }
                 sentenceDisplay.getChildren().add(charText);
             }
@@ -88,7 +177,7 @@ public class TypeTutorView {
                 for (int i = sentence.length(); i < typedText.length(); i++) {
                     Text extraChar = new Text(String.valueOf(typedText.charAt(i)));
                     extraChar.setFont(new Font("Roboto Mono", 30));
-                    extraChar.setFill(Color.web(ERROR_EXTRA_COLOR));
+                    extraChar.setFill(Color.web(currentTheme.getErrorExtraColor()));
                     extraChar.setStyle("-fx-font-weight: bold;");
                     sentenceDisplay.getChildren().add(extraChar);
                 }
@@ -109,7 +198,8 @@ public class TypeTutorView {
             inputField.setDisable(true);
             inputField.setPromptText("Click 'start' to begin...");
             startButton.setText("start");
-            startButton.setStyle("-fx-background-color: " + SUB_COLOR + "; -fx-text-fill: " + BG_COLOR + "; -fx-background-radius: 8; -fx-font-weight: 500; -fx-border-color: transparent; -fx-cursor: hand;");
+            startButton.setStyle("-fx-background-color: " + currentTheme.getSubColor() + "; -fx-text-fill: " +
+                    currentTheme.getBgColor() + "; -fx-background-radius: 8; -fx-font-weight: 500; -fx-border-color: transparent; -fx-cursor: hand;");
             difficultyGroup.getToggles().forEach(toggle -> ((ToggleButton) toggle).setDisable(false));
             timerGroup.getToggles().forEach(toggle -> ((ToggleButton) toggle).setDisable(false));
         });
@@ -122,7 +212,8 @@ public class TypeTutorView {
             inputField.setPromptText("start typing...");
             inputField.requestFocus();
             startButton.setText("stop");
-            startButton.setStyle("-fx-background-color: " + ERROR_COLOR + "; -fx-text-fill: " + BG_COLOR + "; -fx-background-radius: 8; -fx-font-weight: 500; -fx-border-color: transparent; -fx-cursor: hand;");
+            startButton.setStyle("-fx-background-color: " + currentTheme.getErrorColor() + "; -fx-text-fill: " +
+                    currentTheme.getBgColor() + "; -fx-background-radius: 8; -fx-font-weight: 500; -fx-border-color: transparent; -fx-cursor: hand;");
             difficultyGroup.getToggles().forEach(toggle -> ((ToggleButton) toggle).setDisable(true));
             timerGroup.getToggles().forEach(toggle -> ((ToggleButton) toggle).setDisable(true));
         });
@@ -138,12 +229,10 @@ public class TypeTutorView {
             double accuracy = model.getCumulativeTotalChars() > 0 ? (model.getCumulativeCorrectChars() * 100.0 / model.getCumulativeTotalChars()) : 0;
             double consistency = model.calculateConsistency();
 
-            // REDUCED: Main results box with tighter spacing
             HBox mainResultsBox = new HBox(30);
             mainResultsBox.setAlignment(Pos.CENTER);
             mainResultsBox.setPadding(new Insets(5, 0, 5, 0));
 
-            // REDUCED: Left stats with smaller fonts and spacing
             VBox leftStats = new VBox(20);
             leftStats.setAlignment(Pos.CENTER_LEFT);
             leftStats.setPadding(new Insets(10));
@@ -152,25 +241,24 @@ public class TypeTutorView {
             wpmBox.setAlignment(Pos.CENTER_LEFT);
             Label wpmLabel = new Label("wpm");
             wpmLabel.setFont(new Font("Lexend Deca", 20));
-            wpmLabel.setStyle("-fx-text-fill: " + SUB_COLOR + ";");
+            wpmLabel.setStyle("-fx-text-fill: " + currentTheme.getSubColor() + ";");
             Label wpmValue = new Label(String.format("%.0f", wpm));
             wpmValue.setFont(new Font("Lexend Deca", 60));
-            wpmValue.setStyle("-fx-text-fill: " + CARET_COLOR + "; -fx-font-weight: bold;");
+            wpmValue.setStyle("-fx-text-fill: " + currentTheme.getCaretColor() + "; -fx-font-weight: bold;");
             wpmBox.getChildren().addAll(wpmLabel, wpmValue);
 
             VBox accBox = new VBox(5);
             accBox.setAlignment(Pos.CENTER_LEFT);
             Label accLabel = new Label("acc");
             accLabel.setFont(new Font("Lexend Deca", 20));
-            accLabel.setStyle("-fx-text-fill: " + SUB_COLOR + ";");
+            accLabel.setStyle("-fx-text-fill: " + currentTheme.getSubColor() + ";");
             Label accValue = new Label(String.format("%.0f%%", accuracy));
             accValue.setFont(new Font("Lexend Deca", 60));
-            accValue.setStyle("-fx-text-fill: " + CARET_COLOR + "; -fx-font-weight: bold;");
+            accValue.setStyle("-fx-text-fill: " + currentTheme.getCaretColor() + "; -fx-font-weight: bold;");
             accBox.getChildren().addAll(accLabel, accValue);
 
             leftStats.getChildren().addAll(wpmBox, accBox);
 
-            // REDUCED: Smaller chart
             LineChart<Number, Number> chart = createCombinedChart(model);
             chart.setPrefWidth(500);
             chart.setPrefHeight(280);
@@ -178,7 +266,6 @@ public class TypeTutorView {
 
             mainResultsBox.getChildren().addAll(leftStats, chart);
 
-            // REDUCED: Metrics grid with smaller fonts
             GridPane metricsGrid = new GridPane();
             metricsGrid.setAlignment(Pos.CENTER);
             metricsGrid.setHgap(50);
@@ -188,26 +275,45 @@ public class TypeTutorView {
             String diffName = model.getCurrentDifficulty().name().toLowerCase();
             addMetricToGrid(metricsGrid, 0, "test type", String.format("time %d\n%s", model.getSelectedTime(), diffName));
             addMetricToGrid(metricsGrid, 1, "raw", String.format("%.0f", rawWpm));
-            addMetricToGrid(metricsGrid, 2, "characters", String.format("%d/%d/%d/%d", model.getCumulativeCorrectChars(), model.getCumulativeMissedChars(), model.getCumulativeExtraChars(), 0));
+            addMetricToGrid(metricsGrid, 2, "characters", String.format("%d/%d/%d/%d", model.getCumulativeCorrectChars(),
+                    model.getCumulativeMissedChars(), model.getCumulativeExtraChars(), 0));
             addMetricToGrid(metricsGrid, 3, "consistency", String.format("%.0f%%", consistency));
             addMetricToGrid(metricsGrid, 4, "time", String.format("%ds", model.getSelectedTime()));
 
-            // REDUCED: Smaller button
             Button nextTestButton = new Button("next test");
             nextTestButton.setFont(new Font("Lexend Deca", 24));
             nextTestButton.setPrefWidth(200);
             nextTestButton.setPrefHeight(55);
-            nextTestButton.setStyle("-fx-background-color: " + SUB_COLOR + "; -fx-text-fill: " + MAIN_COLOR + "; -fx-background-radius: 18; -fx-font-weight: 500; -fx-border-color: transparent; -fx-cursor: hand;");
-            nextTestButton.setOnMouseEntered(e -> nextTestButton.setStyle("-fx-background-color: " + MAIN_COLOR + "; -fx-text-fill: " + BG_COLOR + "; -fx-background-radius: 18; -fx-font-weight: 600; -fx-border-color: transparent; -fx-cursor: hand;"));
-            nextTestButton.setOnMouseExited(e -> nextTestButton.setStyle("-fx-background-color: " + SUB_COLOR + "; -fx-text-fill: " + MAIN_COLOR + "; -fx-background-radius: 18; -fx-font-weight: 500; -fx-border-color: transparent; -fx-cursor: hand;"));
+            nextTestButton.setStyle("-fx-background-color: " + currentTheme.getSubColor() + "; -fx-text-fill: " +
+                    currentTheme.getMainColor() + "; -fx-background-radius: 18; -fx-font-weight: 500; -fx-border-color: transparent; -fx-cursor: hand;");
+            nextTestButton.setOnMouseEntered(e -> nextTestButton.setStyle("-fx-background-color: " + currentTheme.getMainColor() +
+                    "; -fx-text-fill: " + currentTheme.getBgColor() + "; -fx-background-radius: 18; -fx-font-weight: 600; -fx-border-color: transparent; -fx-cursor: hand;"));
+            nextTestButton.setOnMouseExited(e -> nextTestButton.setStyle("-fx-background-color: " + currentTheme.getSubColor() +
+                    "; -fx-text-fill: " + currentTheme.getMainColor() + "; -fx-background-radius: 18; -fx-font-weight: 500; -fx-border-color: transparent; -fx-cursor: hand;"));
             nextTestButton.setOnAction(nextTestHandler);
 
-            // REDUCED: Tighter vertical spacing
             resultsPanel.getChildren().addAll(mainResultsBox, metricsGrid, nextTestButton);
 
             mainTypingArea.setVisible(false);
             resultsPanel.setVisible(true);
         });
+    }
+
+    private VBox createMetricBox(String label, String value) {
+        VBox box = new VBox(6);
+        box.setAlignment(Pos.CENTER);
+
+        Label labelLabel = new Label(label);
+        labelLabel.setFont(new Font("Lexend Deca", 14));
+        labelLabel.setStyle("-fx-text-fill: " + currentTheme.getSubColor() + "; -fx-font-weight: 300;");
+
+        Label valueLabel = new Label(value);
+        valueLabel.setFont(new Font("Lexend Deca", 22));
+        valueLabel.setStyle("-fx-text-fill: " + currentTheme.getCaretColor() + "; -fx-font-weight: 500;");
+        valueLabel.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
+
+        box.getChildren().addAll(labelLabel, valueLabel);
+        return box;
     }
 
     private StackPane createCenterStackPane() {
@@ -223,7 +329,7 @@ public class TypeTutorView {
     private VBox createMainTypingArea() {
         timerLabel = new Label("30");
         timerLabel.setFont(new Font("Lexend Deca", 28));
-        timerLabel.setStyle("-fx-text-fill: " + CARET_COLOR + "; -fx-font-weight: 300;");
+        timerLabel.setStyle("-fx-text-fill: " + currentTheme.getCaretColor() + "; -fx-font-weight: 300;");
 
         sentenceDisplay = new TextFlow();
         sentenceDisplay.setStyle("-fx-background-color: transparent; -fx-padding: 20;");
@@ -235,14 +341,20 @@ public class TypeTutorView {
         inputField.setFont(new Font("Roboto Mono", 15));
         inputField.setPrefHeight(45);
         inputField.setDisable(true);
-        inputField.setStyle("-fx-background-color: transparent; -fx-text-fill: " + MAIN_COLOR + "; -fx-prompt-text-fill: " + SUB_COLOR + "; -fx-background-radius: 8; -fx-border-color: " + SUB_COLOR + "; -fx-border-radius: 8; -fx-border-width: 2; -fx-padding: 12;");
+        inputField.setStyle("-fx-background-color: transparent; -fx-text-fill: " + currentTheme.getMainColor() +
+                "; -fx-prompt-text-fill: " + currentTheme.getSubColor() + "; -fx-background-radius: 8; -fx-border-color: " +
+                currentTheme.getSubColor() + "; -fx-border-radius: 8; -fx-border-width: 2; -fx-padding: 12;");
 
         inputField.focusedProperty().addListener((obs, oldVal, newVal) -> {
             boolean isGameActive = !startButton.getText().equals("start");
             if (newVal && isGameActive) {
-                inputField.setStyle("-fx-background-color: transparent; -fx-text-fill: " + MAIN_COLOR + "; -fx-prompt-text-fill: " + SUB_COLOR + "; -fx-background-radius: 8; -fx-border-color: " + CARET_COLOR + "; -fx-border-radius: 8; -fx-border-width: 2; -fx-padding: 12;");
+                inputField.setStyle("-fx-background-color: transparent; -fx-text-fill: " + currentTheme.getMainColor() +
+                        "; -fx-prompt-text-fill: " + currentTheme.getSubColor() + "; -fx-background-radius: 8; -fx-border-color: " +
+                        currentTheme.getCaretColor() + "; -fx-border-radius: 8; -fx-border-width: 2; -fx-padding: 12;");
             } else {
-                inputField.setStyle("-fx-background-color: transparent; -fx-text-fill: " + MAIN_COLOR + "; -fx-prompt-text-fill: " + SUB_COLOR + "; -fx-background-radius: 8; -fx-border-color: " + SUB_COLOR + "; -fx-border-radius: 8; -fx-border-width: 2; -fx-padding: 12;");
+                inputField.setStyle("-fx-background-color: transparent; -fx-text-fill: " + currentTheme.getMainColor() +
+                        "; -fx-prompt-text-fill: " + currentTheme.getSubColor() + "; -fx-background-radius: 8; -fx-border-color: " +
+                        currentTheme.getSubColor() + "; -fx-border-radius: 8; -fx-border-width: 2; -fx-padding: 12;");
             }
         });
 
@@ -250,17 +362,20 @@ public class TypeTutorView {
         startButton.setFont(new Font("Lexend Deca", 18));
         startButton.setPrefWidth(120);
         startButton.setPrefHeight(40);
-        startButton.setStyle("-fx-background-color: " + SUB_COLOR + "; -fx-text-fill: " + BG_COLOR + "; -fx-background-radius: 8; -fx-font-weight: 500; -fx-border-color: transparent; -fx-cursor: hand;");
+        startButton.setStyle("-fx-background-color: " + currentTheme.getSubColor() + "; -fx-text-fill: " +
+                currentTheme.getBgColor() + "; -fx-background-radius: 8; -fx-font-weight: 500; -fx-border-color: transparent; -fx-cursor: hand;");
 
         startButton.setOnMouseEntered(e -> {
             if (startButton.getText().equals("start")) {
-                startButton.setStyle("-fx-background-color: " + MAIN_COLOR + "; -fx-text-fill: " + BG_COLOR + "; -fx-background-radius: 8; -fx-font-weight: 500; -fx-border-color: transparent; -fx-cursor: hand;");
+                startButton.setStyle("-fx-background-color: " + currentTheme.getMainColor() + "; -fx-text-fill: " +
+                        currentTheme.getBgColor() + "; -fx-background-radius: 8; -fx-font-weight: 500; -fx-border-color: transparent; -fx-cursor: hand;");
             }
         });
 
         startButton.setOnMouseExited(e -> {
             if (startButton.getText().equals("start")) {
-                startButton.setStyle("-fx-background-color: " + SUB_COLOR + "; -fx-text-fill: " + BG_COLOR + "; -fx-background-radius: 8; -fx-font-weight: 500; -fx-border-color: transparent; -fx-cursor: hand;");
+                startButton.setStyle("-fx-background-color: " + currentTheme.getSubColor() + "; -fx-text-fill: " +
+                        currentTheme.getBgColor() + "; -fx-background-radius: 8; -fx-font-weight: 500; -fx-border-color: transparent; -fx-cursor: hand;");
             }
         });
 
@@ -294,23 +409,27 @@ public class TypeTutorView {
 
         Label titleLabel = new Label("Type Tutor");
         titleLabel.setFont(new Font("Lexend Deca", 36));
-        titleLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: " + CARET_COLOR + ";");
+        titleLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: " + currentTheme.getCaretColor() + ";");
+
+        // Store reference to title for theme updates
+        this.titleLabel = titleLabel;
 
         HBox controlBar = new HBox(30);
         controlBar.setAlignment(Pos.CENTER);
         controlBar.setPadding(new Insets(5, 0, 5, 0));
 
+        // Difficulty section
         difficultyGroup = new ToggleGroup();
         HBox difficultySection = new HBox(8);
         difficultySection.setAlignment(Pos.CENTER);
 
         Label difficultyIcon = new Label("@");
         difficultyIcon.setFont(new Font("Consolas", 16));
-        difficultyIcon.setStyle("-fx-text-fill: " + SUB_COLOR + ";");
+        difficultyIcon.setStyle("-fx-text-fill: " + currentTheme.getSubColor() + ";");
 
         Label difficultyLabel = new Label("difficulty");
         difficultyLabel.setFont(new Font("Lexend Deca", 12));
-        difficultyLabel.setStyle("-fx-text-fill: " + SUB_COLOR + ";");
+        difficultyLabel.setStyle("-fx-text-fill: " + currentTheme.getSubColor() + ";");
 
         HBox difficultyButtons = new HBox(5);
         difficultyButtons.setAlignment(Pos.CENTER);
@@ -323,17 +442,18 @@ public class TypeTutorView {
         difficultyButtons.getChildren().addAll(beginnerBtn, intermediateBtn, advancedBtn);
         difficultySection.getChildren().addAll(difficultyIcon, difficultyLabel, difficultyButtons);
 
+        // Timer section
         timerGroup = new ToggleGroup();
         HBox timerSection = new HBox(8);
         timerSection.setAlignment(Pos.CENTER);
 
         Label timerIcon = new Label("⏱");
         timerIcon.setFont(new Font("Consolas", 16));
-        timerIcon.setStyle("-fx-text-fill: " + SUB_COLOR + ";");
+        timerIcon.setStyle("-fx-text-fill: " + currentTheme.getSubColor() + ";");
 
         Label timerSectionLabel = new Label("time");
         timerSectionLabel.setFont(new Font("Lexend Deca", 12));
-        timerSectionLabel.setStyle("-fx-text-fill: " + SUB_COLOR + ";");
+        timerSectionLabel.setStyle("-fx-text-fill: " + currentTheme.getSubColor() + ";");
 
         HBox timerButtons = new HBox(5);
         timerButtons.setAlignment(Pos.CENTER);
@@ -348,7 +468,63 @@ public class TypeTutorView {
         timerButtons.getChildren().addAll(time15Btn, time30Btn, time60Btn, time120Btn, customBtn);
         timerSection.getChildren().addAll(timerIcon, timerSectionLabel, timerButtons);
 
-        controlBar.getChildren().addAll(difficultySection, createSeparator(), timerSection);
+        // Theme section
+        HBox themeSection = new HBox(8);
+        themeSection.setAlignment(Pos.CENTER);
+
+        Label themeIcon = new Label("🎨");
+        themeIcon.setFont(new Font("Consolas", 16));
+        themeIcon.setStyle("-fx-text-fill: " + currentTheme.getSubColor() + ";");
+
+        Label themeSectionLabel = new Label("theme");
+        themeSectionLabel.setFont(new Font("Lexend Deca", 12));
+        themeSectionLabel.setStyle("-fx-text-fill: " + currentTheme.getSubColor() + ";");
+
+        // Theme MenuButton with proper styling
+        MenuButton themeMenuButton = new MenuButton(currentTheme.getName());
+        themeMenuButton.setFont(new Font("Lexend Deca", 14));
+        themeMenuButton.setTextFill(Color.web(currentTheme.getMainColor()));
+        themeMenuButton.setStyle("-fx-background-color: " + currentTheme.getSubAltColor() +
+                "; -fx-background-radius: 6; -fx-padding: 5 14; -fx-cursor: hand;");
+
+        // Add all themes to dropdown
+        for (Theme theme : themeManager.getAllThemes()) {
+            MenuItem themeItem = new MenuItem(theme.getName());
+
+            // Style menu item text
+            themeItem.setStyle("-fx-text-fill: " + currentTheme.getMainColor() + ";");
+
+            themeItem.setOnAction(e -> {
+                applyTheme(theme);
+                themeMenuButton.setText(theme.getName());
+                themeMenuButton.setTextFill(Color.web(theme.getMainColor()));
+                themeMenuButton.setStyle("-fx-background-color: " + theme.getSubAltColor() +
+                        "; -fx-background-radius: 6; -fx-padding: 5 14; -fx-cursor: hand;");
+
+                // Update all menu items with new theme colors
+                themeMenuButton.getItems().forEach(item -> {
+                    item.setStyle("-fx-text-fill: " + theme.getMainColor() + ";");
+                });
+            });
+            themeMenuButton.getItems().add(themeItem);
+        }
+
+        // Style the menu popup background
+        themeMenuButton.setOnShowing(e -> {
+            Platform.runLater(() -> {
+                // Find and style the popup
+                if (themeMenuButton.getScene() != null) {
+                    themeMenuButton.getScene().getRoot().lookupAll(".context-menu").forEach(node -> {
+                        node.setStyle("-fx-background-color: " + currentTheme.getBgColor() + "; -fx-border-color: " +
+                                currentTheme.getSubColor() + "; -fx-border-width: 1px;");
+                    });
+                }
+            });
+        });
+
+        themeSection.getChildren().addAll(themeIcon, themeSectionLabel, themeMenuButton);
+
+        controlBar.getChildren().addAll(difficultySection, createSeparator(), timerSection, createSeparator(), themeSection);
         topSection.getChildren().addAll(titleLabel, controlBar);
         return topSection;
     }
@@ -358,28 +534,31 @@ public class TypeTutorView {
         btn.setToggleGroup(group);
         btn.setFont(new Font("Lexend Deca", 18));
         btn.setPrefHeight(28);
-        btn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + SUB_COLOR + "; -fx-border-color: transparent; -fx-background-radius: 6; -fx-padding: 5 14; -fx-cursor: hand;");
+        btn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + currentTheme.getSubColor() +
+                "; -fx-border-color: transparent; -fx-background-radius: 6; -fx-padding: 5 14; -fx-cursor: hand;");
 
         btn.selectedProperty().addListener((obs, oldVal, newVal) -> {
             String baseStyle = "-fx-border-color: transparent; -fx-background-radius: 6; -fx-padding: 5 14; -fx-cursor: hand; -fx-font-size: 18px;";
             if (newVal) {
-                btn.setStyle("-fx-background-color: " + CARET_COLOR + "; -fx-text-fill: " + BG_COLOR + "; -fx-font-weight: 600; " + baseStyle);
+                btn.setStyle("-fx-background-color: " + currentTheme.getCaretColor() + "; -fx-text-fill: " +
+                        currentTheme.getBgColor() + "; -fx-font-weight: 600; " + baseStyle);
             } else {
-                btn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + SUB_COLOR + "; " + baseStyle);
+                btn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + currentTheme.getSubColor() + "; " + baseStyle);
             }
         });
 
         btn.setOnMouseEntered(e -> {
             if (!btn.isSelected()) {
                 String baseStyle = "-fx-border-color: transparent; -fx-background-radius: 6; -fx-padding: 5 14; -fx-cursor: hand; -fx-font-size: 18px;";
-                btn.setStyle("-fx-background-color: " + SUB_ALT_COLOR + "; -fx-text-fill: " + MAIN_COLOR + "; " + baseStyle);
+                btn.setStyle("-fx-background-color: " + currentTheme.getSubAltColor() + "; -fx-text-fill: " +
+                        currentTheme.getMainColor() + "; " + baseStyle);
             }
         });
 
         btn.setOnMouseExited(e -> {
             if (!btn.isSelected()) {
                 String baseStyle = "-fx-border-color: transparent; -fx-background-radius: 6; -fx-padding: 5 14; -fx-cursor: hand; -fx-font-size: 18px;";
-                btn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + SUB_COLOR + "; " + baseStyle);
+                btn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + currentTheme.getSubColor() + "; " + baseStyle);
             }
         });
 
@@ -390,7 +569,7 @@ public class TypeTutorView {
         Region separator = new Region();
         separator.setPrefWidth(1);
         separator.setPrefHeight(20);
-        separator.setStyle("-fx-background-color: " + SUB_COLOR + "; -fx-opacity: 0.3;");
+        separator.setStyle("-fx-background-color: " + currentTheme.getSubColor() + "; -fx-opacity: 0.3;");
         return separator;
     }
 
@@ -400,11 +579,11 @@ public class TypeTutorView {
 
         Label labelLabel = new Label(label);
         labelLabel.setFont(new Font("Lexend Deca", 16));
-        labelLabel.setStyle("-fx-text-fill: " + SUB_COLOR + ";");
+        labelLabel.setStyle("-fx-text-fill: " + currentTheme.getSubColor() + ";");
 
         Label valueLabel = new Label(value);
         valueLabel.setFont(new Font("Lexend Deca", 24));
-        valueLabel.setStyle("-fx-text-fill: " + MAIN_COLOR + "; -fx-font-weight: 500;");
+        valueLabel.setStyle("-fx-text-fill: " + currentTheme.getCaretColor() + "; -fx-font-weight: 500;");
         valueLabel.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
 
         metricBox.getChildren().addAll(labelLabel, valueLabel);
@@ -426,17 +605,15 @@ public class TypeTutorView {
         styleAxis(yAxis);
 
         LineChart<Number, Number> chart = new LineChart<>(xAxis, yAxis);
-        chart.setLegendVisible(true);
-        chart.setCreateSymbols(true);
+        chart.setLegendVisible(false);
+        chart.setCreateSymbols(false);
         styleChart(chart);
 
-        // Create series with explicit names
         XYChart.Series<Number, Number> wpmSeries = new XYChart.Series<>();
         wpmSeries.setName("wpm");
         XYChart.Series<Number, Number> errorSeries = new XYChart.Series<>();
         errorSeries.setName("errors");
 
-        // Populate data
         for (TypeTutorModel.WPMSnapshot snapshot : model.getWpmHistory()) {
             wpmSeries.getData().add(new XYChart.Data<>(snapshot.second, snapshot.wpm));
         }
@@ -444,43 +621,25 @@ public class TypeTutorView {
             errorSeries.getData().add(new XYChart.Data<>(snapshot.second, snapshot.errors));
         }
 
-        // Add series to chart (order matters for styling)
         chart.getData().addAll(wpmSeries, errorSeries);
 
-        // Style the chart elements after rendering
         Platform.runLater(() -> {
-            // Style WPM series (series0) with yellow/CARET_COLOR
-            for (XYChart.Data<Number, Number> data : wpmSeries.getData()) {
-                Circle circle = new Circle(4);
-                circle.setFill(Color.web(CARET_COLOR));
-                data.setNode(circle);
+            if (chart.lookup(".chart-plot-background") != null) {
+                chart.lookup(".chart-plot-background").setStyle("-fx-background-color: " + currentTheme.getSubAltColor() + ";");
             }
 
-            // Style error series (series1) with red/ERROR_COLOR
-            for (XYChart.Data<Number, Number> data : errorSeries.getData()) {
-                Circle circle = new Circle(4);
-                circle.setFill(Color.web(ERROR_COLOR));
-                data.setNode(circle);
-            }
-
-            // Style the lines
             chart.lookupAll(".chart-series-line").forEach(node -> {
                 if (node.getStyleClass().contains("series0")) {
-                    // WPM line - yellow
-                    node.setStyle("-fx-stroke: " + CARET_COLOR + "; -fx-stroke-width: 3px;");
+                    node.setStyle("-fx-stroke: " + currentTheme.getCaretColor() + "; -fx-stroke-width: 2.5px;");
                 } else if (node.getStyleClass().contains("series1")) {
-                    // Error line - red
-                    node.setStyle("-fx-stroke: " + ERROR_COLOR + "; -fx-stroke-width: 3px;");
+                    node.setStyle("-fx-stroke: " + currentTheme.getErrorColor() + "; -fx-stroke-width: 2.5px;");
                 }
             });
 
-            // Style legend symbols to match
-            chart.lookupAll(".chart-legend-item-symbol").forEach(node -> {
-                if (node.getStyleClass().contains("series0")) {
-                    node.setStyle("-fx-background-color: " + CARET_COLOR + ";");
-                } else if (node.getStyleClass().contains("series1")) {
-                    node.setStyle("-fx-background-color: " + ERROR_COLOR + ";");
-                }
+            chart.setVerticalGridLinesVisible(false);
+            chart.setHorizontalGridLinesVisible(true);
+            chart.lookupAll(".chart-horizontal-grid-lines").forEach(node -> {
+                node.setStyle("-fx-stroke: " + currentTheme.getSubColor() + "; -fx-stroke-width: 0.5px; -fx-opacity: 0.15;");
             });
         });
 
@@ -488,17 +647,17 @@ public class TypeTutorView {
     }
 
     private void styleChart(LineChart<Number, Number> chart) {
-        chart.setStyle("-fx-background-color: transparent; -fx-font-size: 14px;");
+        chart.setStyle("-fx-background-color: " + currentTheme.getBgColor() + "; -fx-font-size: 14px;");
         Platform.runLater(() -> {
             if (chart.lookup(".chart-plot-background") != null) {
-                chart.lookup(".chart-plot-background").setStyle("-fx-background-color: " + SUB_ALT_COLOR + ";");
+                chart.lookup(".chart-plot-background").setStyle("-fx-background-color: " + currentTheme.getSubAltColor() + ";");
             }
         });
-        chart.setLegendVisible(true);
+        chart.setLegendVisible(false);
     }
 
     private void styleAxis(NumberAxis axis) {
-        axis.setStyle("-fx-tick-label-fill: " + SUB_COLOR + "; -fx-font-size: 14px;");
-        axis.setTickLabelFill(Color.web(SUB_COLOR));
+        axis.setStyle("-fx-tick-label-fill: " + currentTheme.getSubColor() + "; -fx-font-size: 14px;");
+        axis.setTickLabelFill(Color.web(currentTheme.getSubColor()));
     }
 }
