@@ -5,26 +5,30 @@ import javafx.stage.Stage;
 
 public class TypeTutor extends Application {
 
-    private DatabaseManager dbManager;  // NEW: Database manager instance
+    private DatabaseManager dbManager;
+    private ThemeManager themeManager;
 
     @Override
     public void start(Stage primaryStage) {
-        // NEW: Initialize database (choose "sqlite" or "mysql")
-        dbManager = new DatabaseManager();  // Use SQLite for simplicity
+        // Initialize theme manager first
+        themeManager = new ThemeManager();
+
+        // Initialize MySQL database
+        dbManager = new DatabaseManager();
 
         // Create the Model to hold the application's data and state
         TypeTutorModel model = new TypeTutorModel();
 
-        // Create the View to manage the user interface
-        TypeTutorView view = new TypeTutorView(primaryStage);
+        // Create the View with theme manager
+        TypeTutorView view = new TypeTutorView(primaryStage, themeManager);
 
-        // NEW: Create the Controller with database support
+        // Create the Controller with database support
         TypeTutorController controller = new TypeTutorController(model, view, dbManager);
     }
 
     @Override
     public void stop() {
-        // NEW: Clean up database connection when application closes
+        // Clean up database connection when application closes
         if (dbManager != null) {
             dbManager.closeConnection();
         }
