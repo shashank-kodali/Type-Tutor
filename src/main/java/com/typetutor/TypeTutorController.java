@@ -1,9 +1,12 @@
 package com.typetutor;
 
 import javafx.application.Platform;
+import javafx.scene.control.Alert;
 import javafx.scene.control.DialogPane;
 import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.ToggleButton;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import java.sql.SQLException;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -12,19 +15,22 @@ public class TypeTutorController {
 
     private final TypeTutorModel model;
     private final TypeTutorView view;
-    private final DatabaseManager dbManager;  // NEW: Database manager
+    private final DatabaseManager dbManager;
     private Timer gameTimer;
-    private int currentUserId = -1;  // NEW: Track current user
+    private int currentUserId = -1;
 
     public TypeTutorController(TypeTutorModel model, TypeTutorView view, DatabaseManager dbManager) {
         this.model = model;
         this.view = view;
-        this.dbManager = dbManager;  // NEW: Initialize database manager
+        this.dbManager = dbManager;
 
-        // NEW: Prompt for username on startup
         promptForUsername();
-
         attachEventHandlers();
+
+        // Wire up feature button callbacks
+        view.setOnStatsButtonClick(this::openStatistics);
+        view.setOnLeaderboardButtonClick(this::openLeaderboard);
+        view.setOnShortcutsButtonClick(this::showShortcutsHelp);
 
         model.prepareLongText();
         model.loadNewSentence();
@@ -35,9 +41,198 @@ public class TypeTutorController {
             model.loadNewSentence();
             view.displaySentence(model.getCurrentSentence(), "");
         }));
+
+        // Setup keyboard shortcuts after UI is ready
+        Platform.runLater(this::setupKeyboardShortcuts);
     }
 
-    // NEW: Prompt user to enter username
+    /**
+     * Setup keyboard shortcuts
+     */
+    private void setupKeyboardShortcuts() {
+        if (view.getScene() == null) {
+            System.err.println("Scene not available yet for keyboard shortcuts");
+            return;
+        }
+
+        view.getScene().addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+            // Tab - Restart test (only when not typing in input field)
+            if (event.getCode() == KeyCode.TAB && !view.getInputField().isFocused()) {
+                event.consume();
+                if (!model.isGameActive()) {
+                    handleNextTest();
+                }
+            }
+
+            // Escape - Stop test early
+            else if (event.getCode() == KeyCode.ESCAPE) {
+                event.consume();
+                if (model.isGameActive()) {
+                    endTest();
+                }
+            }
+
+            // Ctrl+Shift+P - Open statistics
+            else if (event.isControlDown() && event.isShiftDown() && event.getCode() == KeyCode.P) {
+                event.consume();
+                openStatistics();
+            }
+
+            // Ctrl+Shift+L - Open leaderboard
+            else if (event.isControlDown() && event.isShiftDown() && event.getCode() == KeyCode.L) {
+                event.consume();
+                openLeaderboard();
+            }
+
+            // Ctrl+Shift+H - Show shortcuts help
+            else if (event.isControlDown() && event.isShiftDown() && event.getCode() == KeyCode.H) {
+                event.consume();
+                showShortcutsHelp();
+            }
+
+            // Ctrl+1/2/3 - Change difficulty (only when not in test)
+            else if (event.isControlDown() && !model.isGameActive()) {
+                if (event.getCode() == KeyCode.DIGIT1) {
+                    event.consume();
+                    changeDifficulty(TypeTutorModel.Difficulty.BEGINNER);
+                } else if (event.getCode() == KeyCode.DIGIT2) {
+                    event.consume();
+                    changeDifficulty(TypeTutorModel.Difficulty.INTERMEDIATE);
+                } else if (event.getCode() == KeyCode.DIGIT3) {
+                    event.consume();
+                    changeDifficulty(TypeTutorModel.Difficulty.ADVANCED);
+                }
+            }
+        });
+
+        System.out.println("⌨️  Keyboard shortcuts enabled!");
+        System.out.println("   Tab - Restart test");
+        System.out.println("   Esc - Stop test");
+        System.out.println("   Ctrl+Shift+P - Statistics");
+        System.out.println("   Ctrl+Shift+L - Leaderboard");
+        System.out.println("   Ctrl+Shift+H - Show shortcuts");
+        System.out.println("   Ctrl+1/2/3 - Change difficulty");
+    }
+
+    /**
+     * Open statistics dashboard
+     */
+    private void openStatistics() {
+        if (currentUserId == -1) {
+            System.out.println("No user logged in - cannot show statistics");
+            showErrorDialog("Please log in to view statistics");
+            return;
+        }
+
+        try {
+            StatsView statsView = new StatsView(dbManager, view.getThemeManager(), currentUserId);
+            statsView.show();
+            // Request focus back to main window after stats closes
+            Platform.runLater(() -> {
+                if (view.getScene() != null && view.getScene().getWindow() != null) {
+                    view.getScene().getWindow().requestFocus();
+                }
+            });
+        } catch (Exception e) {
+            System.err.println("Error opening statistics: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Open leaderboard
+     */
+    private void openLeaderboard() {
+        try {
+            LeaderboardView leaderboardView = new LeaderboardView(dbManager, view.getThemeManager(), currentUserId);
+            leaderboardView.show();
+            // Request focus back to main window after leaderboard closes
+            Platform.runLater(() -> {
+                if (view.getScene() != null && view.getScene().getWindow() != null) {
+                    view.getScene().getWindow().requestFocus();
+                }
+            });
+        } catch (Exception e) {
+            System.err.println("Error opening leaderboard: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Show keyboard shortcuts help dialog
+     */
+    private void showShortcutsHelp() {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Keyboard Shortcuts");
+        alert.setHeaderText("⌨️ Available Keyboard Shortcuts");
+
+        String shortcuts =
+                "Tab              - Restart test (when not typing)\n" +
+                        "Escape           - Stop current test\n" +
+                        "Ctrl+Shift+P     - Open Statistics Dashboard\n" +
+                        "Ctrl+Shift+L     - Open Leaderboard\n" +
+                        "Ctrl+Shift+H     - Show this help\n" +
+                        "Ctrl+1           - Switch to Beginner difficulty\n" +
+                        "Ctrl+2           - Switch to Intermediate difficulty\n" +
+                        "Ctrl+3           - Switch to Advanced difficulty";
+
+        alert.setContentText(shortcuts);
+
+        // Style the dialog with theme colors
+        try {
+            DialogPane dialogPane = alert.getDialogPane();
+            Theme currentTheme = view.getThemeManager().getCurrentTheme();
+            dialogPane.setStyle("-fx-background-color: " + currentTheme.getBgColor() + ";");
+
+            if (dialogPane.lookup(".content.label") != null) {
+                dialogPane.lookup(".content.label").setStyle("-fx-text-fill: " + currentTheme.getMainColor() + ";");
+            }
+            if (dialogPane.lookup(".header-panel") != null) {
+                dialogPane.lookup(".header-panel").setStyle("-fx-background-color: " + currentTheme.getSubAltColor() + ";");
+            }
+        } catch (Exception e) {
+            // If styling fails, show unstyled dialog
+        }
+
+        alert.showAndWait();
+    }
+
+    /**
+     * Show error dialog
+     */
+    private void showErrorDialog(String message) {
+        Alert alert = new Alert(Alert.AlertType.WARNING);
+        alert.setTitle("Notice");
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.showAndWait();
+    }
+
+    /**
+     * Change difficulty level
+     */
+    private void changeDifficulty(TypeTutorModel.Difficulty difficulty) {
+        if (model.isGameActive()) {
+            return;
+        }
+
+        model.setCurrentDifficulty(difficulty);
+        model.prepareLongText();
+        model.loadNewSentence();
+        view.displaySentence(model.getCurrentSentence(), "");
+
+        // Update UI toggle buttons
+        String diffName = difficulty.name().toLowerCase();
+        view.getDifficultyGroup().getToggles().forEach(toggle -> {
+            ToggleButton btn = (ToggleButton) toggle;
+            if (btn.getText().equals(diffName)) {
+                btn.setSelected(true);
+            }
+        });
+
+        System.out.println("✓ Switched to " + diffName + " difficulty");
+    }
+
     private void promptForUsername() {
         TextInputDialog dialog = new TextInputDialog("Guest");
         dialog.setTitle("Welcome to Type Tutor");
@@ -46,14 +241,15 @@ public class TypeTutorController {
 
         DialogPane dialogPane = dialog.getDialogPane();
         dialogPane.setStyle("-fx-background-color: #323437;");
-        dialogPane.lookup(".content.label").setStyle("-fx-text-fill: #d1d0c5;");
+        if (dialogPane.lookup(".content.label") != null) {
+            dialogPane.lookup(".content.label").setStyle("-fx-text-fill: #d1d0c5;");
+        }
 
         dialog.showAndWait().ifPresent(username -> {
             try {
                 currentUserId = dbManager.getOrCreateUser(username);
                 System.out.println("Logged in as: " + username + " (ID: " + currentUserId + ")");
 
-                // Show user statistics
                 DatabaseManager.UserStatistics stats = dbManager.getUserStatistics(currentUserId);
                 if (stats != null && stats.totalTests > 0) {
                     System.out.println("Your Stats: " + stats);
@@ -96,9 +292,15 @@ public class TypeTutorController {
 
                     DialogPane dialogPane = dialog.getDialogPane();
                     dialogPane.setStyle("-fx-background-color: #323437;");
-                    dialogPane.lookup(".content.label").setStyle("-fx-text-fill: #d1d0c5;");
-                    dialogPane.lookup(".header-panel").setStyle("-fx-background-color: #2c2e31;");
-                    dialogPane.lookup(".header-panel .label").setStyle("-fx-text-fill: #d1d0c5;");
+                    if (dialogPane.lookup(".content.label") != null) {
+                        dialogPane.lookup(".content.label").setStyle("-fx-text-fill: #d1d0c5;");
+                    }
+                    if (dialogPane.lookup(".header-panel") != null) {
+                        dialogPane.lookup(".header-panel").setStyle("-fx-background-color: #2c2e31;");
+                    }
+                    if (dialogPane.lookup(".header-panel .label") != null) {
+                        dialogPane.lookup(".header-panel .label").setStyle("-fx-text-fill: #d1d0c5;");
+                    }
 
                     dialog.showAndWait().ifPresent(seconds -> {
                         try {
@@ -209,20 +411,17 @@ public class TypeTutorController {
         System.out.println("  Final Accuracy: " + String.format("%.1f%%", finalAccuracy));
         System.out.println("==================\n");
 
-        // NEW: Save test result to database
         saveTestToDatabase();
 
         view.showResults(model, e -> handleNextTest());
     }
 
-    // NEW: Save test result to database
     private void saveTestToDatabase() {
         if (currentUserId != -1) {
             try {
                 int resultId = dbManager.saveTestResult(currentUserId, model);
                 System.out.println("Test result saved to database (ID: " + resultId + ")");
 
-                // Print updated user statistics
                 DatabaseManager.UserStatistics stats = dbManager.getUserStatistics(currentUserId);
                 if (stats != null) {
                     System.out.println("Updated Stats: " + stats);
