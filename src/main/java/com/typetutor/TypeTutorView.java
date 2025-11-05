@@ -250,10 +250,12 @@ public class TypeTutorView {
         Platform.runLater(() -> {
             resultsPanel.getChildren().clear();
 
-            double timeInMinutes = model.getSelectedTime() / 60.0;
+            double elapsedSeconds = Math.max(1.0, model.getTestDurationSeconds());
+            double timeInMinutes = elapsedSeconds / 60.0;
             double wpm = (model.getCumulativeCorrectChars() / 5.0) / timeInMinutes;
             double rawWpm = (model.getCumulativeTotalChars() / 5.0) / timeInMinutes;
-            double accuracy = model.getCumulativeTotalChars() > 0 ? (model.getCumulativeCorrectChars() * 100.0 / model.getCumulativeTotalChars()) : 0;
+            double accuracy = model.getCumulativeTargetChars() > 0 ?
+                    (model.getCumulativeCorrectChars() * 100.0 / model.getCumulativeTargetChars()) : 0;
             double consistency = model.calculateConsistency();
 
             HBox mainResultsBox = new HBox(30);
@@ -300,12 +302,16 @@ public class TypeTutorView {
             metricsGrid.setPadding(new Insets(10, 0, 10, 0));
 
             String diffName = model.getCurrentDifficulty().name().toLowerCase();
-            addMetricToGrid(metricsGrid, 0, "test type", String.format("time %d\n%s", model.getSelectedTime(), diffName));
+            addMetricToGrid(metricsGrid, 0, "test type", String.format("time %d (%d actual)\n%s",
+                    model.getSelectedTime(), Math.round(elapsedSeconds), diffName));
             addMetricToGrid(metricsGrid, 1, "raw", String.format("%.0f", rawWpm));
-            addMetricToGrid(metricsGrid, 2, "characters", String.format("%d/%d/%d/%d", model.getCumulativeCorrectChars(),
-                    model.getCumulativeMissedChars(), model.getCumulativeExtraChars(), 0));
+            addMetricToGrid(metricsGrid, 2, "characters", String.format("%d/%d/%d/%d",
+                    model.getCumulativeCorrectChars(),
+                    model.getCumulativeMissedChars(),
+                    model.getCumulativeExtraChars(),
+                    model.getCumulativeTargetChars()));
             addMetricToGrid(metricsGrid, 3, "consistency", String.format("%.0f%%", consistency));
-            addMetricToGrid(metricsGrid, 4, "time", String.format("%ds", model.getSelectedTime()));
+            addMetricToGrid(metricsGrid, 4, "time", String.format("%.1fs", elapsedSeconds));
 
             Button nextTestButton = new Button("next test");
             nextTestButton.setFont(new Font("Lexend Deca", 24));
