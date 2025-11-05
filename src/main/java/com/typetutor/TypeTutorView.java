@@ -36,11 +36,38 @@ public class TypeTutorView {
     private BorderPane root;
     private Scene scene;
 
+    // Callbacks for feature buttons
+    private Runnable onStatsButtonClick;
+    private Runnable onLeaderboardButtonClick;
+    private Runnable onShortcutsButtonClick;
+
     public TextField getInputField() { return inputField; }
     public Button getStartButton() { return startButton; }
     public ToggleGroup getDifficultyGroup() { return difficultyGroup; }
     public ToggleGroup getTimerGroup() { return timerGroup; }
     public ThemeManager getThemeManager() { return themeManager; }
+    public Scene getScene() { return scene; }
+
+    /**
+     * Set callback for statistics button
+     */
+    public void setOnStatsButtonClick(Runnable callback) {
+        this.onStatsButtonClick = callback;
+    }
+
+    /**
+     * Set callback for leaderboard button
+     */
+    public void setOnLeaderboardButtonClick(Runnable callback) {
+        this.onLeaderboardButtonClick = callback;
+    }
+
+    /**
+     * Set callback for shortcuts button
+     */
+    public void setOnShortcutsButtonClick(Runnable callback) {
+        this.onShortcutsButtonClick = callback;
+    }
 
     public TypeTutorView(Stage primaryStage, ThemeManager themeManager) {
         this.themeManager = themeManager;
@@ -414,6 +441,9 @@ public class TypeTutorView {
         // Store reference to title for theme updates
         this.titleLabel = titleLabel;
 
+        // Feature buttons row (above control bar)
+        HBox featureButtons = createFeatureButtons();
+
         HBox controlBar = new HBox(30);
         controlBar.setAlignment(Pos.CENTER);
         controlBar.setPadding(new Insets(5, 0, 5, 0));
@@ -525,8 +555,71 @@ public class TypeTutorView {
         themeSection.getChildren().addAll(themeIcon, themeSectionLabel, themeMenuButton);
 
         controlBar.getChildren().addAll(difficultySection, createSeparator(), timerSection, createSeparator(), themeSection);
-        topSection.getChildren().addAll(titleLabel, controlBar);
+        topSection.getChildren().addAll(titleLabel, featureButtons, controlBar);
         return topSection;
+    }
+
+    /**
+     * Create feature buttons row (Statistics, Leaderboard, Help)
+     */
+    private HBox createFeatureButtons() {
+        HBox buttonsRow = new HBox(15);
+        buttonsRow.setAlignment(Pos.CENTER);
+        buttonsRow.setPadding(new Insets(10, 0, 5, 0));
+
+        // Statistics button
+        Button statsButton = new Button("📊 Statistics");
+        statsButton.setFont(new Font("Lexend Deca", 14));
+        statsButton.setPrefWidth(140);
+        statsButton.setPrefHeight(35);
+        statsButton.setStyle("-fx-background-color: " + currentTheme.getSubAltColor() + "; -fx-text-fill: " +
+                currentTheme.getMainColor() + "; -fx-background-radius: 8; -fx-cursor: hand;");
+        statsButton.setOnAction(e -> {
+            if (onStatsButtonClick != null) {
+                onStatsButtonClick.run();
+            }
+        });
+        statsButton.setOnMouseEntered(e -> statsButton.setStyle("-fx-background-color: " + currentTheme.getCaretColor() +
+                "; -fx-text-fill: " + currentTheme.getBgColor() + "; -fx-background-radius: 8; -fx-cursor: hand; -fx-font-weight: bold;"));
+        statsButton.setOnMouseExited(e -> statsButton.setStyle("-fx-background-color: " + currentTheme.getSubAltColor() +
+                "; -fx-text-fill: " + currentTheme.getMainColor() + "; -fx-background-radius: 8; -fx-cursor: hand;"));
+
+        // Leaderboard button
+        Button leaderboardButton = new Button("🏆 Leaderboard");
+        leaderboardButton.setFont(new Font("Lexend Deca", 14));
+        leaderboardButton.setPrefWidth(140);
+        leaderboardButton.setPrefHeight(35);
+        leaderboardButton.setStyle("-fx-background-color: " + currentTheme.getSubAltColor() + "; -fx-text-fill: " +
+                currentTheme.getMainColor() + "; -fx-background-radius: 8; -fx-cursor: hand;");
+        leaderboardButton.setOnAction(e -> {
+            if (onLeaderboardButtonClick != null) {
+                onLeaderboardButtonClick.run();
+            }
+        });
+        leaderboardButton.setOnMouseEntered(e -> leaderboardButton.setStyle("-fx-background-color: " + currentTheme.getCaretColor() +
+                "; -fx-text-fill: " + currentTheme.getBgColor() + "; -fx-background-radius: 8; -fx-cursor: hand; -fx-font-weight: bold;"));
+        leaderboardButton.setOnMouseExited(e -> leaderboardButton.setStyle("-fx-background-color: " + currentTheme.getSubAltColor() +
+                "; -fx-text-fill: " + currentTheme.getMainColor() + "; -fx-background-radius: 8; -fx-cursor: hand;"));
+
+        // Keyboard Shortcuts button
+        Button shortcutsButton = new Button("⌨️ Shortcuts");
+        shortcutsButton.setFont(new Font("Lexend Deca", 14));
+        shortcutsButton.setPrefWidth(140);
+        shortcutsButton.setPrefHeight(35);
+        shortcutsButton.setStyle("-fx-background-color: " + currentTheme.getSubAltColor() + "; -fx-text-fill: " +
+                currentTheme.getMainColor() + "; -fx-background-radius: 8; -fx-cursor: hand;");
+        shortcutsButton.setOnAction(e -> {
+            if (onShortcutsButtonClick != null) {
+                onShortcutsButtonClick.run();
+            }
+        });
+        shortcutsButton.setOnMouseEntered(e -> shortcutsButton.setStyle("-fx-background-color: " + currentTheme.getCaretColor() +
+                "; -fx-text-fill: " + currentTheme.getBgColor() + "; -fx-background-radius: 8; -fx-cursor: hand; -fx-font-weight: bold;"));
+        shortcutsButton.setOnMouseExited(e -> shortcutsButton.setStyle("-fx-background-color: " + currentTheme.getSubAltColor() +
+                "; -fx-text-fill: " + currentTheme.getMainColor() + "; -fx-background-radius: 8; -fx-cursor: hand;"));
+
+        buttonsRow.getChildren().addAll(statsButton, leaderboardButton, shortcutsButton);
+        return buttonsRow;
     }
 
     private ToggleButton createMonkeyToggleButton(String text, ToggleGroup group) {
