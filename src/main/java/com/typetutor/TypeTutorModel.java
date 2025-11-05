@@ -10,6 +10,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CompletableFuture;
 
 public class TypeTutorModel {
@@ -49,18 +50,21 @@ public class TypeTutorModel {
     private String currentSentence = "";
     private String typedText = "";
 
-    private List<String> textPool = new ArrayList<>();
+    private final List<String> textPool = new CopyOnWriteArrayList<>();
     private String longText = "";
     private int textPosition = 0;
     private int currentTextIndex = 0;
     private static final int TEXT_CHUNK_SIZE = 200;
 
-    private List<WPMSnapshot> wpmHistory = new ArrayList<>();
-    private List<ErrorSnapshot> errorHistory = new ArrayList<>();
+    private final List<WPMSnapshot> wpmHistory = new ArrayList<>();
+    private final List<ErrorSnapshot> errorHistory = new ArrayList<>();
     private int cumulativeCorrectChars = 0;
     private int cumulativeTotalChars = 0;
+    private int cumulativeTargetChars = 0;
     private int cumulativeMissedChars = 0;
     private int cumulativeExtraChars = 0;
+    private long testStartNano = 0L;
+    private double testDurationSeconds = 0.0;
 
     // --- Getters and Setters ---
     public boolean isGameActive() { return isGameActive; }
@@ -77,8 +81,22 @@ public class TypeTutorModel {
     public List<ErrorSnapshot> getErrorHistory() { return errorHistory; }
     public int getCumulativeCorrectChars() { return cumulativeCorrectChars; }
     public int getCumulativeTotalChars() { return cumulativeTotalChars; }
+    public int getCumulativeTargetChars() { return cumulativeTargetChars; }
     public int getCumulativeMissedChars() { return cumulativeMissedChars; }
     public int getCumulativeExtraChars() { return cumulativeExtraChars; }
+    public double getTestDurationSeconds() { return testDurationSeconds > 0.0 ? testDurationSeconds : getElapsedTimeSeconds(); }
+
+    public int getElapsedSeconds() { return (int) Math.floor(getElapsedTimeSeconds()); }
+
+    public double getElapsedTimeSeconds() {
+        if (testStartNano == 0L) {
+            return testDurationSeconds;
+        }
+        if (!isGameActive && testDurationSeconds > 0.0) {
+            return testDurationSeconds;
+        }
+        return (System.nanoTime() - testStartNano) / 1_000_000_000.0;
+    }
 
     // --- Core Logic Methods ---
     public void resetForTest() {
@@ -87,21 +105,40 @@ public class TypeTutorModel {
         this.errorHistory.clear();
         this.cumulativeCorrectChars = 0;
         this.cumulativeTotalChars = 0;
+        this.cumulativeTargetChars = 0;
         this.cumulativeMissedChars = 0;
         this.cumulativeExtraChars = 0;
         this.textPosition = 0;
         this.typedText = "";
+        this.testStartNano = 0L;
+        this.testDurationSeconds = 0.0;
     }
 
-    public void tick() {
+    public void markTestStarted() {
+        this.testStartNano = System.nanoTime();
+        this.testDurationSeconds = 0.0;
+        this.remainingSeconds = this.selectedTime;
+    }
+
+    public void updateRemainingTime() {
         if (isGameActive) {
-            remainingSeconds--;
+            int elapsed = getElapsedSeconds();
+            this.remainingSeconds = Math.max(0, this.selectedTime - elapsed);
         }
     }
 
-    public void processCompletedSentence(int correct, int total, int missed, int extra) {
+    public void finalizeTestDuration() {
+        if (testStartNano != 0L) {
+            this.testDurationSeconds = getElapsedTimeSeconds();
+            this.testStartNano = 0L;
+            this.remainingSeconds = Math.max(0, this.selectedTime - (int) Math.floor(testDurationSeconds));
+        }
+    }
+
+    public void processCompletedSentence(int correct, int typed, int target, int missed, int extra) {
         this.cumulativeCorrectChars += correct;
-        this.cumulativeTotalChars += total;
+        this.cumulativeTotalChars += typed;
+        this.cumulativeTargetChars += target;
         this.cumulativeMissedChars += missed;
         this.cumulativeExtraChars += extra;
         this.textPosition += this.currentSentence.length();
@@ -109,9 +146,10 @@ public class TypeTutorModel {
         loadNewSentence();
     }
 
-    public void processFinalChars(int correct, int total, int missed, int extra) {
+    public void processFinalChars(int correct, int typed, int target, int missed, int extra) {
         this.cumulativeCorrectChars += correct;
-        this.cumulativeTotalChars += total;
+        this.cumulativeTotalChars += typed;
+        this.cumulativeTargetChars += target;
         this.cumulativeMissedChars += missed;
         this.cumulativeExtraChars += extra;
     }
@@ -159,13 +197,14 @@ public class TypeTutorModel {
     // --- ASYNC TEXT LOADING WITH FALLBACK ---
     public CompletableFuture<Void> loadTextsAsync() {
         return CompletableFuture.runAsync(() -> {
+            boolean loadedAny = false;
             // First, try to fetch from web URLs
             for (String urlString : GUTENBERG_URLS) {
                 try {
                     String content = fetchTextFromUrl(urlString);
                     textPool.add(cleanText(content));
                     System.out.println("Successfully loaded text from URL: " + urlString);
-                    return; // Exit after first success
+                    loadedAny = true;
                 } catch (Exception e) {
                     System.err.println("Could not fetch from URL: " + urlString);
                 }
@@ -177,14 +216,14 @@ public class TypeTutorModel {
                     String content = new String(Files.readAllBytes(Paths.get(filePath)));
                     textPool.add(cleanText(content));
                     System.out.println("Successfully loaded text from local file: " + filePath);
-                    return; // Exit after first success
+                    loadedAny = true;
                 } catch (IOException e) {
                     System.err.println("Could not load local file: " + filePath);
                 }
             }
 
             // FIXED: If both web and local fail, use generated samples as fallback
-            if (textPool.isEmpty()) {
+            if (!loadedAny && textPool.isEmpty()) {
                 textPool.add(generateSampleText());
                 System.out.println("Using generated sample text as fallback.");
             }

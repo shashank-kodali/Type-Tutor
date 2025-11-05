@@ -138,11 +138,12 @@ public class DatabaseManager {
      * Save a complete test result to database
      */
     public int saveTestResult(int userId, TypeTutorModel model) throws SQLException {
-        double timeInMinutes = model.getSelectedTime() / 60.0;
+        double elapsedSeconds = Math.max(1.0, model.getTestDurationSeconds());
+        double timeInMinutes = elapsedSeconds / 60.0;
         double wpm = (model.getCumulativeCorrectChars() / 5.0) / timeInMinutes;
         double rawWpm = (model.getCumulativeTotalChars() / 5.0) / timeInMinutes;
-        double accuracy = model.getCumulativeTotalChars() > 0 ?
-                (model.getCumulativeCorrectChars() * 100.0 / model.getCumulativeTotalChars()) : 0;
+        double accuracy = model.getCumulativeTargetChars() > 0 ?
+                (model.getCumulativeCorrectChars() * 100.0 / model.getCumulativeTargetChars()) : 0;
         double consistency = model.calculateConsistency();
 
         String sql = "INSERT INTO test_results " +
@@ -153,7 +154,7 @@ public class DatabaseManager {
         PreparedStatement stmt = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
         stmt.setInt(1, userId);
         stmt.setString(2, model.getCurrentDifficulty().name());
-        stmt.setInt(3, model.getSelectedTime());
+        stmt.setInt(3, (int) Math.round(elapsedSeconds));
         stmt.setDouble(4, wpm);
         stmt.setDouble(5, rawWpm);
         stmt.setDouble(6, accuracy);

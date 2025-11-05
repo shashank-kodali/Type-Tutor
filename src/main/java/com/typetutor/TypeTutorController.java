@@ -1,5 +1,7 @@
 package com.typetutor;
 
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.scene.control.Alert;
 import javafx.scene.control.DialogPane;
@@ -7,16 +9,15 @@ import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
+import javafx.util.Duration;
 import java.sql.SQLException;
-import java.util.Timer;
-import java.util.TimerTask;
 
 public class TypeTutorController {
 
     private final TypeTutorModel model;
     private final TypeTutorView view;
     private final DatabaseManager dbManager;
-    private Timer gameTimer;
+    private Timeline gameTimeline;
     private int currentUserId = -1;
 
     public TypeTutorController(TypeTutorModel model, TypeTutorView view, DatabaseManager dbManager) {
@@ -344,27 +345,29 @@ public class TypeTutorController {
         System.out.println("Duration: " + model.getSelectedTime() + " seconds");
         System.out.println("Difficulty: " + model.getCurrentDifficulty());
 
-        gameTimer = new Timer(true);
-        gameTimer.scheduleAtFixedRate(new TimerTask() {
-            @Override
-            public void run() {
-                tick();
-            }
-        }, 1000, 1000);
+        model.markTestStarted();
+
+        gameTimeline = new Timeline(new KeyFrame(Duration.seconds(1), event -> tick()));
+        gameTimeline.setCycleCount(Timeline.INDEFINITE);
+        gameTimeline.playFromStart();
     }
 
     private void tick() {
-        model.tick();
-        Platform.runLater(() -> view.updateTimerLabel(String.valueOf(model.getRemainingSeconds())));
+        model.updateRemainingTime();
+        view.updateTimerLabel(String.valueOf(model.getRemainingSeconds()));
 
-        int elapsedSeconds = model.getSelectedTime() - model.getRemainingSeconds();
-        if (elapsedSeconds <= 0) return;
+        double elapsedSecondsPrecise = model.getElapsedTimeSeconds();
+        if (elapsedSecondsPrecise < 1.0) {
+            return;
+        }
 
-        int[] stats = processCharacterComparison(model.getTypedText(), false);
-        int totalCorrect = model.getCumulativeCorrectChars() + stats[0];
-        int totalTyped = model.getCumulativeTotalChars() + stats[1];
-        int totalErrors = model.getCumulativeMissedChars() + model.getCumulativeExtraChars() + stats[2] + stats[3];
-        double minutes = elapsedSeconds / 60.0;
+        int elapsedSeconds = (int) Math.floor(elapsedSecondsPrecise);
+        ComparisonResult stats = processCharacterComparison(model.getTypedText(), false);
+        int totalCorrect = model.getCumulativeCorrectChars() + stats.correct;
+        int totalTyped = model.getCumulativeTotalChars() + stats.typed;
+        int totalTarget = model.getCumulativeTargetChars() + stats.target;
+        int totalErrors = model.getCumulativeMissedChars() + stats.missed + model.getCumulativeExtraChars() + stats.extra;
+        double minutes = elapsedSecondsPrecise / 60.0;
 
         if (minutes > 0) {
             double wpm = (totalCorrect / 5.0) / minutes;
@@ -372,12 +375,14 @@ public class TypeTutorController {
             model.getWpmHistory().add(new TypeTutorModel.WPMSnapshot(elapsedSeconds, wpm, rawWpm));
             model.getErrorHistory().add(new TypeTutorModel.ErrorSnapshot(elapsedSeconds, totalErrors));
 
+            double accuracy = totalTarget > 0 ? (totalCorrect * 100.0 / totalTarget) : 0.0;
             System.out.println("Second " + elapsedSeconds + ": WPM=" + String.format("%.1f", wpm) +
-                    ", Raw=" + String.format("%.1f", rawWpm) + ", Errors=" + totalErrors);
+                    ", Raw=" + String.format("%.1f", rawWpm) + ", Errors=" + totalErrors +
+                    ", Accuracy=" + String.format("%.1f%%", accuracy));
         }
 
         if (model.getRemainingSeconds() <= 0) {
-            Platform.runLater(this::endTest);
+            endTest();
         }
     }
 
@@ -385,11 +390,12 @@ public class TypeTutorController {
         if (!model.isGameActive()) return;
 
         model.setGameActive(false);
-        if (gameTimer != null) {
-            gameTimer.cancel();
+        if (gameTimeline != null) {
+            gameTimeline.stop();
         }
 
         processCharacterComparison(model.getTypedText(), true);
+        model.finalizeTestDuration();
 
         System.out.println("\n=== Test Ended ===");
         System.out.println("Final Stats:");
@@ -400,11 +406,12 @@ public class TypeTutorController {
         System.out.println("  WPM history size: " + model.getWpmHistory().size());
         System.out.println("  Error history size: " + model.getErrorHistory().size());
 
-        double timeInMinutes = model.getSelectedTime() / 60.0;
+        double elapsedSeconds = Math.max(1.0, model.getTestDurationSeconds());
+        double timeInMinutes = elapsedSeconds / 60.0;
         double finalWpm = (model.getCumulativeCorrectChars() / 5.0) / timeInMinutes;
         double finalRawWpm = (model.getCumulativeTotalChars() / 5.0) / timeInMinutes;
-        double finalAccuracy = model.getCumulativeTotalChars() > 0 ?
-                (model.getCumulativeCorrectChars() * 100.0 / model.getCumulativeTotalChars()) : 0;
+        double finalAccuracy = model.getCumulativeTargetChars() > 0 ?
+                (model.getCumulativeCorrectChars() * 100.0 / model.getCumulativeTargetChars()) : 0;
 
         System.out.println("  Final WPM: " + String.format("%.1f", finalWpm));
         System.out.println("  Final Raw WPM: " + String.format("%.1f", finalRawWpm));
@@ -449,8 +456,8 @@ public class TypeTutorController {
         view.displaySentence(model.getCurrentSentence(), typedText);
 
         if (typedText.equals(model.getCurrentSentence())) {
-            int[] stats = processCharacterComparison(typedText, false);
-            model.processCompletedSentence(stats[0], stats[1], stats[2], stats[3]);
+            ComparisonResult stats = processCharacterComparison(typedText, false);
+            model.processCompletedSentence(stats.correct, stats.typed, stats.target, stats.missed, stats.extra);
 
             Platform.runLater(() -> {
                 view.getInputField().clear();
@@ -459,14 +466,16 @@ public class TypeTutorController {
         }
     }
 
-    private int[] processCharacterComparison(String typedText, boolean isFinal) {
+    private ComparisonResult processCharacterComparison(String typedText, boolean isFinal) {
         int correct = 0;
         int missed = 0;
         int extra = 0;
-        int total = typedText.length();
+        int typed = typedText.length();
         String currentSentence = model.getCurrentSentence();
+        int sentenceLength = currentSentence.length();
+        int target = Math.min(typed, sentenceLength);
 
-        int matchLength = Math.min(currentSentence.length(), typedText.length());
+        int matchLength = Math.min(sentenceLength, typed);
         for (int i = 0; i < matchLength; i++) {
             if (currentSentence.charAt(i) == typedText.charAt(i)) {
                 correct++;
@@ -475,14 +484,34 @@ public class TypeTutorController {
             }
         }
 
-        if (typedText.length() > currentSentence.length()) {
-            extra = typedText.length() - currentSentence.length();
+        if (typed > sentenceLength) {
+            extra = typed - sentenceLength;
+            target = sentenceLength;
+        } else if (sentenceLength > typed && isFinal) {
+            missed += sentenceLength - typed;
+            target = sentenceLength;
         }
 
         if (isFinal) {
-            model.processFinalChars(correct, total, missed, extra);
+            model.processFinalChars(correct, typed, target, missed, extra);
         }
 
-        return new int[]{correct, total, missed, extra};
+        return new ComparisonResult(correct, typed, target, missed, extra);
+    }
+
+    private static class ComparisonResult {
+        final int correct;
+        final int typed;
+        final int target;
+        final int missed;
+        final int extra;
+
+        ComparisonResult(int correct, int typed, int target, int missed, int extra) {
+            this.correct = correct;
+            this.typed = typed;
+            this.target = target;
+            this.missed = missed;
+            this.extra = extra;
+        }
     }
 }
